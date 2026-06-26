@@ -29,6 +29,7 @@ setup(
         'console_scripts': [
             'piper_single_ctrl = piper.piper_ctrl_single_node:main',
             'piper_read_slave_joint = piper.piper_read_slave_joint:main',
+            'piper_joint_menu = piper.piper_joint_menu:main',
         ],
     },
 )

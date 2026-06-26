@@ -218,6 +218,14 @@ disable_arm() {
   ros_exec "ros2 service call /enable_srv piper_msgs/srv/Enable '{enable_request: false}'"
 }
 
+launch_joint_menu() {
+  echo "启动关节控制小菜单。"
+  echo "注意：请先启动机械臂控制节点并使能，确认机械臂工作范围内无人、无障碍物。"
+  echo "默认发布到 /joint_states，对应 start_single_piper.launch.py 的控制输入。"
+  echo
+  ros_exec "ros2 run piper piper_joint_menu"
+}
+
 stop_container() {
   echo "停止 Humble 容器。"
   docker compose -f "${COMPOSE_FILE}" down
@@ -243,7 +251,8 @@ main_menu() {
     echo "9) 重启网页服务（重新构建并启动）"
     echo "10) 使能机械臂"
     echo "11) 失能机械臂"
-    echo "12) 停止 Humble 容器"
+    echo "12) 关节控制小菜单"
+    echo "13) 停止 Humble 容器"
     echo "0) 退出"
     echo
     if [ -n "${PENDING_CHOICE}" ]; then
@@ -267,7 +276,8 @@ main_menu() {
       9) restart_web_monitor; pause ;;
       10) enable_arm; pause ;;
       11) disable_arm; pause ;;
-      12) stop_container; pause ;;
+      12) launch_joint_menu; pause ;;
+      13) stop_container; pause ;;
       0) exit 0 ;;
       *) echo "无效选择。"; pause ;;
     esac
