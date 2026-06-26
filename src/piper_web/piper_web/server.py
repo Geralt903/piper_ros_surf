@@ -141,7 +141,7 @@ class PiperRequestHandler(BaseHTTPRequestHandler):
 
         if parsed.path.startswith('/meshes/'):
             mesh_name = parsed.path[8:]
-            if '..' in mesh_name or '/' in mesh_name:
+            if '..' in mesh_name:
                 self.send_error(404)
                 return
             target = self.server.mesh_dir / mesh_name
