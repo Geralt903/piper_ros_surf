@@ -139,6 +139,22 @@ class PiperRequestHandler(BaseHTTPRequestHandler):
             self._send_json(self.server.ros_node.config())
             return
 
+        if parsed.path.startswith('/meshes/'):
+            mesh_name = parsed.path[8:]
+            target = (self.server.mesh_dir / mesh_name).resolve()
+            if not str(target).startswith(str(self.server.mesh_dir.resolve())) or not target.is_file():
+                self.send_error(404)
+                return
+            content_type = mimetypes.guess_type(str(target))[0] or 'application/octet-stream'
+            body = target.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         path = parsed.path if parsed.path != '/' else '/index.html'
         target = (self.server.static_dir / path.lstrip('/')).resolve()
         if not str(target).startswith(str(self.server.static_dir.resolve())) or not target.is_file():
@@ -250,9 +266,11 @@ def normalize_config(config):
 
 def start_http_server(node, host, port):
     static_dir = Path(get_package_share_directory('piper_web')) / 'static'
+    mesh_dir = Path(get_package_share_directory('piper_description')) / 'meshes'
     httpd = ThreadingHTTPServer((host, port), PiperRequestHandler)
     httpd.ros_node = node
     httpd.static_dir = static_dir
+    httpd.mesh_dir = mesh_dir
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     node.get_logger().info(f'Piper web monitor: http://{host}:{port}')

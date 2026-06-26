@@ -1,4 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
+import { STLLoader } from 'https://unpkg.com/three@0.165.0/examples/jsm/loaders/STLLoader.js';
 
 const canvas = document.querySelector('#scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -58,6 +59,8 @@ let config = structuredClone(defaultConfig);
 const frameOrder = ['base_link', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'gripper_base', 'link7', 'link8'];
 const markers = new Map();
 const linkSegments = new Map();
+const linkVisuals = new Map();
+const stlLoader = new STLLoader();
 
 const base = new THREE.Mesh(
   new THREE.CylinderGeometry(0.09, 0.12, 0.08, 40),
@@ -90,6 +93,42 @@ for (const joint of robotJoints) {
   );
   linkSegments.set(joint.name, segment);
   arm.add(segment);
+}
+
+const meshColors = {
+  base_link: 0x9aa7b2,
+  link1: 0xb9c4ce,
+  link2: 0xb4c1d8,
+  link3: 0xaebbd0,
+  link4: 0xc1cbd4,
+  link5: 0xb9c4ce,
+  link6: 0xd8e0e5,
+  gripper_base: 0xaab5bf,
+  link7: 0xf2b84b,
+  link8: 0xf2b84b,
+};
+
+for (const frameName of frameOrder) {
+  stlLoader.load(
+    `/meshes/${frameName}.STL`,
+    (geometry) => {
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+          color: meshColors[frameName] ?? 0xb9c4ce,
+          roughness: 0.58,
+          metalness: 0.08,
+        })
+      );
+      linkVisuals.set(frameName, mesh);
+      arm.add(mesh);
+    },
+    undefined,
+    () => {
+      // Some deployments may omit meshes; the abstract skeleton still remains usable.
+    }
+  );
 }
 
 const els = {
@@ -146,9 +185,11 @@ function readJointValue(name) {
   }
 
   const gripperIndex = jointNames.indexOf('gripper');
-  const gripperValue = gripperIndex >= 0 ? Math.max(0, Math.min(0.07, latestPositions[gripperIndex] ?? 0)) : 0;
-  if (name === 'joint7') return gripperValue / 2;
-  if (name === 'joint8') return -gripperValue / 2;
+  if (gripperIndex >= 0) {
+    const gripperValue = Math.max(0, Math.min(0.07, latestPositions[gripperIndex] ?? 0));
+    if (name === 'joint7') return gripperValue / 2;
+    if (name === 'joint8') return -gripperValue / 2;
+  }
   return 0;
 }
 
@@ -300,6 +341,7 @@ function syncPositionBuffer() {
 
 function applyArmPose(delta) {
   syncPositionBuffer();
+  base.visible = !linkVisuals.has('base_link');
   for (let i = 0; i < latestPositions.length; i += 1) {
     latestPositions[i] += ((targetPositions[i] ?? 0) - latestPositions[i]) * Math.min(1, delta * 8);
   }
@@ -317,6 +359,12 @@ function applyArmPose(delta) {
     const frame = frames.get(frameName);
     if (!frame) continue;
     marker.position.setFromMatrixPosition(frame);
+  }
+
+  for (const [frameName, visual] of linkVisuals.entries()) {
+    const frame = frames.get(frameName);
+    if (!frame) continue;
+    frame.decompose(visual.position, visual.quaternion, visual.scale);
   }
 
   for (const joint of robotJoints) {
