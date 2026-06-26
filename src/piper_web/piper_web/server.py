@@ -141,8 +141,11 @@ class PiperRequestHandler(BaseHTTPRequestHandler):
 
         if parsed.path.startswith('/meshes/'):
             mesh_name = parsed.path[8:]
-            target = (self.server.mesh_dir / mesh_name).resolve()
-            if not str(target).startswith(str(self.server.mesh_dir.resolve())) or not target.is_file():
+            if '..' in mesh_name or '/' in mesh_name:
+                self.send_error(404)
+                return
+            target = self.server.mesh_dir / mesh_name
+            if not target.is_file():
                 self.send_error(404)
                 return
             content_type = mimetypes.guess_type(str(target))[0] or 'application/octet-stream'
@@ -156,8 +159,12 @@ class PiperRequestHandler(BaseHTTPRequestHandler):
             return
 
         path = parsed.path if parsed.path != '/' else '/index.html'
-        target = (self.server.static_dir / path.lstrip('/')).resolve()
-        if not str(target).startswith(str(self.server.static_dir.resolve())) or not target.is_file():
+        clean = path.lstrip('/')
+        if '..' in clean:
+            self.send_error(404)
+            return
+        target = self.server.static_dir / clean
+        if not target.is_file():
             self.send_error(404)
             return
 
