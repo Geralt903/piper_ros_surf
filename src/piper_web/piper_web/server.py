@@ -175,7 +175,7 @@ class PiperWebNode(Node):
 
         return True, 'ok', {
             'joint_names': command.name,
-            'positions': command.position,
+            'positions': [float(value) for value in command.position],
         }
 
     def moveit_pose_command(self, payload, timeout_sec=5.0):
@@ -258,7 +258,7 @@ class PiperWebNode(Node):
 
         return True, 'ok', {
             'joint_names': command.name,
-            'positions': command.position,
+            'positions': [float(value) for value in command.position],
         }
 
     def jog_pose_command(self, payload):
