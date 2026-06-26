@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import threading
 import time
+import traceback
 from urllib.parse import urlparse
 
 from ament_index_python.packages import get_package_share_directory
@@ -365,6 +366,17 @@ class PiperRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        try:
+            self._do_POST()
+        except Exception as exc:
+            try:
+                self.server.ros_node.get_logger().error(f'HTTP POST {self.path} failed: {exc}')
+                self.server.ros_node.get_logger().error(traceback.format_exc())
+            except Exception:
+                pass
+            self._send_json({'ok': False, 'error': str(exc)}, status=500)
+
+    def _do_POST(self):
         parsed = urlparse(self.path)
         if parsed.path == '/api/config':
             try:
