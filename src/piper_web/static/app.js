@@ -1,6 +1,7 @@
 import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
 import { STLLoader } from 'https://unpkg.com/three@0.165.0/examples/jsm/loaders/STLLoader.js';
 
+const MODEL_VERSION = 3;
 const canvas = document.querySelector('#scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -19,26 +20,53 @@ scene.add(keyLight);
 const grid = new THREE.GridHelper(5, 20, 0x3b454d, 0x252b30);
 scene.add(grid);
 
+const axisGroup = new THREE.Group();
+axisGroup.position.set(0, 0.02, 0);
+scene.add(axisGroup);
+
+function makeAxisLabel(text, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 96;
+  canvas.height = 96;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = color;
+  ctx.font = '700 54px ui-sans-serif, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(0.16, 0.16, 0.16);
+  return sprite;
+}
+
+function addAxis(direction, color, label) {
+  const start = new THREE.Vector3(0, 0, 0);
+  const end = direction.clone().multiplyScalar(0.55);
+  const arrow = new THREE.ArrowHelper(direction.clone().normalize(), start, 0.55, color, 0.08, 0.045);
+  axisGroup.add(arrow);
+
+  const text = makeAxisLabel(label, `#${color.toString(16).padStart(6, '0')}`);
+  text.position.copy(end.multiplyScalar(1.12));
+  axisGroup.add(text);
+}
+
+addAxis(new THREE.Vector3(1, 0, 0), 0xef6963, 'X');
+addAxis(new THREE.Vector3(0, 1, 0), 0x42c27a, 'Y');
+addAxis(new THREE.Vector3(0, 0, 1), 0x5aa7ff, 'Z');
+
 const arm = new THREE.Group();
 arm.rotation.x = -Math.PI / 2;
 arm.scale.setScalar(3.6);
 scene.add(arm);
 
-const robotJoints = [
-  { name: 'joint1', parent: 'base_link', child: 'link1', type: 'revolute', xyz: [0, 0, 0.123], rpy: [0, 0, 0], axis: [0, 0, 1] },
-  { name: 'joint2', parent: 'link1', child: 'link2', type: 'revolute', xyz: [0, 0, 0], rpy: [1.5708, -0.1359, -3.1416], axis: [0, 0, 1] },
-  { name: 'joint3', parent: 'link2', child: 'link3', type: 'revolute', xyz: [0.28503, 0, 0], rpy: [0, 0, -1.7939], axis: [0, 0, 1] },
-  { name: 'joint4', parent: 'link3', child: 'link4', type: 'revolute', xyz: [-0.021984, -0.25075, 0], rpy: [1.5708, 0, 0], axis: [0, 0, 1] },
-  { name: 'joint5', parent: 'link4', child: 'link5', type: 'revolute', xyz: [0, 0, 0], rpy: [-1.5708, 0, 0], axis: [0, 0, 1] },
-  { name: 'joint6', parent: 'link5', child: 'link6', type: 'revolute', xyz: [0.000088259, -0.091, 0], rpy: [1.5708, 0, 0], axis: [0, 0, 1] },
-  { name: 'joint6_to_gripper_base', parent: 'link6', child: 'gripper_base', type: 'fixed', xyz: [0, 0, 0], rpy: [0, 0, 0], axis: [0, 0, 0] },
-  { name: 'joint7', parent: 'gripper_base', child: 'link7', type: 'prismatic', xyz: [0, 0, 0.1358], rpy: [1.5708, 0, 0], axis: [0, 0, 1] },
-  { name: 'joint8', parent: 'gripper_base', child: 'link8', type: 'prismatic', xyz: [0, 0, 0.1358], rpy: [1.5708, 0, -3.1416], axis: [0, 0, -1] },
-];
-
 const adjustableJoints = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7', 'joint8'];
 const defaultConfig = {
   display: {
+    model_version: MODEL_VERSION,
     joint_offsets: Object.fromEntries(adjustableJoints.map((name) => [name, 0])),
     joint_directions: Object.fromEntries(adjustableJoints.map((name) => [name, name === 'joint2' ? -1 : 1])),
   },
@@ -56,7 +84,8 @@ const defaultConfig = {
 
 let config = structuredClone(defaultConfig);
 
-const frameOrder = ['base_link', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'gripper_base', 'link7', 'link8'];
+let robotJoints = [];
+let baseLinkName = 'base_link';
 const linkVisuals = new Map();
 const stlLoader = new STLLoader();
 
@@ -81,21 +110,44 @@ const meshColors = {
   link8: 0xf2b84b,
 };
 
-for (const frameName of frameOrder) {
+function parseVector(value, fallback) {
+  if (!value) return [...fallback];
+  const values = value.trim().split(/\s+/).map(Number);
+  return values.length === 3 && values.every(Number.isFinite) ? values : [...fallback];
+}
+
+function parseOrigin(element) {
+  const origin = element?.querySelector(':scope > origin');
+  return {
+    xyz: parseVector(origin?.getAttribute('xyz'), [0, 0, 0]),
+    rpy: parseVector(origin?.getAttribute('rpy'), [0, 0, 0]),
+  };
+}
+
+function packageMeshToUrl(filename) {
+  return filename.replace(/^package:\/\/piper_description\/meshes\//, '/meshes/');
+}
+
+function addLinkVisual(linkName, meshUrl, origin) {
   stlLoader.load(
-    `/meshes/${frameName}.STL`,
+    meshUrl,
     (geometry) => {
       geometry.computeVertexNormals();
+      const visual = new THREE.Group();
       const mesh = new THREE.Mesh(
         geometry,
         new THREE.MeshStandardMaterial({
-          color: meshColors[frameName] ?? 0xb9c4ce,
+          color: meshColors[linkName] ?? 0xb9c4ce,
           roughness: 0.58,
           metalness: 0.08,
         })
       );
-      linkVisuals.set(frameName, mesh);
-      arm.add(mesh);
+
+      const visualMatrix = makeOriginMatrix({ xyz: origin.xyz, rpy: origin.rpy });
+      visualMatrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+      visual.add(mesh);
+      linkVisuals.set(linkName, visual);
+      arm.add(visual);
     },
     undefined,
     () => {
@@ -104,17 +156,69 @@ for (const frameName of frameOrder) {
   );
 }
 
+function parseRobotModel(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  const parserError = doc.querySelector('parsererror');
+  if (parserError) throw new Error('URDF XML 解析失败');
+
+  const links = [...doc.querySelectorAll('robot > link')].map((link) => link.getAttribute('name')).filter(Boolean);
+  const joints = [...doc.querySelectorAll('robot > joint')].map((joint) => {
+    const origin = parseOrigin(joint);
+    return {
+      name: joint.getAttribute('name'),
+      type: joint.getAttribute('type') ?? 'fixed',
+      parent: joint.querySelector(':scope > parent')?.getAttribute('link'),
+      child: joint.querySelector(':scope > child')?.getAttribute('link'),
+      axis: parseVector(joint.querySelector(':scope > axis')?.getAttribute('xyz'), [0, 0, 1]),
+      xyz: origin.xyz,
+      rpy: origin.rpy,
+    };
+  }).filter((joint) => joint.name && joint.parent && joint.child);
+
+  const childLinks = new Set(joints.map((joint) => joint.child));
+  baseLinkName = links.find((link) => !childLinks.has(link)) ?? 'base_link';
+  robotJoints = joints;
+
+  for (const link of doc.querySelectorAll('robot > link')) {
+    const linkName = link.getAttribute('name');
+    const visual = link.querySelector(':scope > visual');
+    const mesh = visual?.querySelector(':scope > geometry > mesh');
+    const filename = mesh?.getAttribute('filename');
+    if (!linkName || !filename) continue;
+    addLinkVisual(linkName, packageMeshToUrl(filename), parseOrigin(visual));
+  }
+}
+
+async function loadRobotModel() {
+  const response = await fetch('/urdf/piper_description.urdf', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`URDF HTTP ${response.status}`);
+  parseRobotModel(await response.text());
+}
+
 const els = {
   rosState: document.querySelector('#rosState'),
   age: document.querySelector('#age'),
   serviceBadge: document.querySelector('#serviceBadge'),
   enableBtn: document.querySelector('#enableBtn'),
   disableBtn: document.querySelector('#disableBtn'),
+  stopCurrentBtn: document.querySelector('#stopCurrentBtn'),
   ctrlMode: document.querySelector('#ctrlMode'),
   armStatus: document.querySelector('#armStatus'),
   motionStatus: document.querySelector('#motionStatus'),
   errCode: document.querySelector('#errCode'),
   jointList: document.querySelector('#jointList'),
+  feedbackPose: document.querySelector('#feedbackPose'),
+  solvedPose: document.querySelector('#solvedPose'),
+  cmdX: document.querySelector('#cmdX'),
+  cmdY: document.querySelector('#cmdY'),
+  cmdZ: document.querySelector('#cmdZ'),
+  cmdRoll: document.querySelector('#cmdRoll'),
+  cmdPitch: document.querySelector('#cmdPitch'),
+  cmdYaw: document.querySelector('#cmdYaw'),
+  cmdGripper: document.querySelector('#cmdGripper'),
+  cmdSpeed: document.querySelector('#cmdSpeed'),
+  sendMoveitPoseBtn: document.querySelector('#sendMoveitPoseBtn'),
+  jogButtons: document.querySelectorAll('[data-jog-axis]'),
   calibrationList: document.querySelector('#calibrationList'),
   ikList: document.querySelector('#ikList'),
   zeroCurrentBtn: document.querySelector('#zeroCurrentBtn'),
@@ -195,6 +299,35 @@ function drawJoints() {
   }
 }
 
+function formatPosePosition(position) {
+  if (!position) return '--';
+  return `x ${Number(position.x).toFixed(3)}  y ${Number(position.y).toFixed(3)}  z ${Number(position.z).toFixed(3)} m`;
+}
+
+function computeRobotFrames() {
+  const frames = new Map([[baseLinkName, new THREE.Matrix4().identity()]]);
+  for (const joint of robotJoints) {
+    const parentFrame = frames.get(joint.parent) ?? new THREE.Matrix4().identity();
+    const childFrame = parentFrame.clone()
+      .multiply(makeOriginMatrix(joint))
+      .multiply(makeMotionMatrix(joint, readJointValue(joint.name)));
+    frames.set(joint.child, childFrame);
+  }
+  return frames;
+}
+
+function updateSolvedEndPose(frames) {
+  const endFrame = frames.get('gripper_base') ?? frames.get('link6') ?? frames.get('link8') ?? frames.get('link7');
+  if (!endFrame) {
+    els.solvedPose.textContent = '--';
+    return;
+  }
+
+  const position = new THREE.Vector3();
+  endFrame.decompose(position, new THREE.Quaternion(), new THREE.Vector3());
+  els.solvedPose.textContent = formatPosePosition(position);
+}
+
 function drawCalibration() {
   els.calibrationList.innerHTML = '';
   for (const name of adjustableJoints) {
@@ -241,9 +374,16 @@ function readConfigFromInputs() {
 
 function setConfig(nextConfig) {
   config = structuredClone(defaultConfig);
+  config.display.model_version = Number(nextConfig?.display?.model_version ?? config.display.model_version);
   for (const name of adjustableJoints) {
     config.display.joint_offsets[name] = Number(nextConfig?.display?.joint_offsets?.[name] ?? config.display.joint_offsets[name]);
     config.display.joint_directions[name] = Number(nextConfig?.display?.joint_directions?.[name] ?? config.display.joint_directions[name]) < 0 ? -1 : 1;
+  }
+  if (config.display.model_version < MODEL_VERSION) {
+    config.display.model_version = MODEL_VERSION;
+    for (const name of adjustableJoints) {
+      config.display.joint_directions[name] = defaultConfig.display.joint_directions[name];
+    }
   }
   for (const name of Object.keys(defaultConfig.ik)) {
     config.ik[name] = Number(nextConfig?.ik?.[name] ?? config.ik[name]);
@@ -308,20 +448,15 @@ function applyArmPose(delta) {
     latestPositions[i] += ((targetPositions[i] ?? 0) - latestPositions[i]) * Math.min(1, delta * 8);
   }
 
-  const frames = new Map([['base_link', new THREE.Matrix4().identity()]]);
-  for (const joint of robotJoints) {
-    const parentFrame = frames.get(joint.parent) ?? new THREE.Matrix4().identity();
-    const childFrame = parentFrame.clone()
-      .multiply(makeOriginMatrix(joint))
-      .multiply(makeMotionMatrix(joint, readJointValue(joint.name)));
-    frames.set(joint.child, childFrame);
-  }
+  const frames = computeRobotFrames();
 
   for (const [frameName, visual] of linkVisuals.entries()) {
     const frame = frames.get(frameName);
     if (!frame) continue;
     frame.decompose(visual.position, visual.quaternion, visual.scale);
   }
+
+  updateSolvedEndPose(frames);
 }
 
 async function refreshState() {
@@ -347,6 +482,7 @@ async function refreshState() {
     els.armStatus.textContent = status.arm_status ?? '--';
     els.motionStatus.textContent = status.motion_status ?? '--';
     els.errCode.textContent = status.err_code ?? '--';
+    els.feedbackPose.textContent = formatPosePosition(data.end_pose?.position);
     drawJoints();
   } catch (error) {
     els.rosState.textContent = '后端离线';
@@ -360,6 +496,7 @@ async function setEnable(enable) {
   busy = true;
   els.enableBtn.disabled = true;
   els.disableBtn.disabled = true;
+  els.stopCurrentBtn.disabled = true;
   setMessage(enable ? '正在发送使能命令...' : '正在发送失能命令...');
 
   try {
@@ -377,11 +514,116 @@ async function setEnable(enable) {
     busy = false;
     els.enableBtn.disabled = false;
     els.disableBtn.disabled = false;
+    els.stopCurrentBtn.disabled = false;
+  }
+}
+
+async function stopCurrentPosition() {
+  if (busy) return;
+  busy = true;
+  els.stopCurrentBtn.disabled = true;
+  setMessage('正在发送当前位置保持命令...');
+
+  try {
+    const response = await fetch('/api/stop_current', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
+    setMessage('已发送当前位置保持命令');
+  } catch (error) {
+    setMessage(`停止失败: ${error.message}`, true);
+  } finally {
+    busy = false;
+    els.stopCurrentBtn.disabled = false;
+  }
+}
+
+function readMoveitPoseCommand() {
+  return {
+    frame_id: 'base_link',
+    group_name: 'arm',
+    ik_link_name: 'link6',
+    x: Number(els.cmdX.value) || 0,
+    y: Number(els.cmdY.value) || 0,
+    z: Number(els.cmdZ.value) || 0,
+    roll: Number(els.cmdRoll.value) || 0,
+    pitch: Number(els.cmdPitch.value) || 0,
+    yaw: Number(els.cmdYaw.value) || 0,
+    gripper: Number(els.cmdGripper.value) || 0,
+    speed: Number(els.cmdSpeed.value) || 10,
+    avoid_collisions: true,
+  };
+}
+
+async function sendMoveitPoseCommand() {
+  if (busy) return;
+  busy = true;
+  els.sendMoveitPoseBtn.disabled = true;
+  setMessage('正在请求 MoveIt IK...');
+
+  try {
+    const response = await fetch('/api/moveit_pose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(readMoveitPoseCommand()),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
+    setMessage('MoveIt 已解算，关节目标已发送');
+  } catch (error) {
+    setMessage(`MoveIt 控制失败: ${error.message}`, true);
+  } finally {
+    busy = false;
+    els.sendMoveitPoseBtn.disabled = false;
+  }
+}
+
+async function jogPose(axis, value) {
+  if (busy) return;
+  busy = true;
+  els.jogButtons.forEach((button) => {
+    button.disabled = true;
+  });
+  setMessage(`正在微调 ${axis.toUpperCase()} ${value > 0 ? '+' : ''}${value.toFixed(1)}...`);
+
+  const payload = {
+    dx: axis === 'x' ? value : 0,
+    dy: axis === 'y' ? value : 0,
+    dz: axis === 'z' ? value : 0,
+    speed: Number(els.cmdSpeed.value) || 10,
+  };
+
+  try {
+    const response = await fetch('/api/jog_pose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
+    setMessage(`已发送 ${axis.toUpperCase()} ${value > 0 ? '+' : ''}${value.toFixed(1)} 微调命令`);
+  } catch (error) {
+    setMessage(`微调失败: ${error.message}`, true);
+  } finally {
+    busy = false;
+    els.jogButtons.forEach((button) => {
+      button.disabled = false;
+    });
   }
 }
 
 els.enableBtn.addEventListener('click', () => setEnable(true));
 els.disableBtn.addEventListener('click', () => setEnable(false));
+els.stopCurrentBtn.addEventListener('click', stopCurrentPosition);
+els.sendMoveitPoseBtn.addEventListener('click', sendMoveitPoseCommand);
+els.jogButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    jogPose(button.dataset.jogAxis, Number(button.dataset.jogValue) || 0);
+  });
+});
 els.calibrationList.addEventListener('input', readConfigFromInputs);
 els.calibrationList.addEventListener('change', readConfigFromInputs);
 els.ikList.addEventListener('input', readConfigFromInputs);
@@ -402,10 +644,19 @@ function animate(now) {
   requestAnimationFrame(animate);
 }
 
-resize();
-drawJoints();
-setConfig(defaultConfig);
-loadConfig();
-refreshState();
-setInterval(refreshState, 200);
-requestAnimationFrame(animate);
+async function start() {
+  resize();
+  drawJoints();
+  setConfig(defaultConfig);
+  try {
+    await loadRobotModel();
+  } catch (error) {
+    setMessage(`URDF 加载失败: ${error.message}`, true);
+  }
+  await loadConfig();
+  await refreshState();
+  setInterval(refreshState, 200);
+  requestAnimationFrame(animate);
+}
+
+start();

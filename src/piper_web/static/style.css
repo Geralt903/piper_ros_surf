@@ -164,11 +164,25 @@ button.primary {
   background: #1f6f48;
 }
 
+button.danger {
+  border-color: #a94945;
+  background: #78302f;
+}
+
 button.small {
   width: auto;
   height: 30px;
   padding: 0 10px;
   font-size: 12px;
+}
+
+button.wide {
+  width: 100%;
+  margin-top: 10px;
+}
+
+button.wide-action {
+  grid-column: 1 / -1;
 }
 
 .status-grid {
@@ -180,6 +194,34 @@ button.small {
 .status-grid > div {
   padding: 12px;
   border-radius: 8px;
+}
+
+.pose-block {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pose-block > div {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(27, 32, 36, 0.88);
+}
+
+.pose-block span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pose-block strong {
+  display: block;
+  margin-top: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .status-grid strong {
@@ -211,11 +253,28 @@ button.small {
 }
 
 .calibration-list,
-.ik-list {
+.ik-list,
+.pose-command-grid,
+.jog-grid {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
+}
+
+.pose-command-grid,
+.jog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pose-command-grid label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pose-command-grid input {
+  margin-top: 5px;
 }
 
 .calibration-row {

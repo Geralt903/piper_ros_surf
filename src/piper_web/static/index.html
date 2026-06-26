@@ -31,6 +31,7 @@
         <div class="actions">
           <button id="enableBtn" class="primary" type="button">使能</button>
           <button id="disableBtn" type="button">失能</button>
+          <button id="stopCurrentBtn" class="danger wide-action" type="button">停止在当前位置</button>
         </div>
 
         <section class="status-grid" aria-label="机械臂状态">
@@ -55,6 +56,47 @@
         <section>
           <h2>关节角度</h2>
           <div id="jointList" class="joint-list"></div>
+        </section>
+
+        <section>
+          <h2>末端坐标</h2>
+          <div class="pose-block">
+            <div>
+              <span>驱动反馈</span>
+              <strong id="feedbackPose">--</strong>
+            </div>
+            <div>
+              <span>URDF 解算</span>
+              <strong id="solvedPose">--</strong>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>MoveIt 坐标控制</h2>
+          <div class="pose-command-grid">
+            <label>x<input id="cmdX" type="number" step="0.001" value="0.250"></label>
+            <label>y<input id="cmdY" type="number" step="0.001" value="0.000"></label>
+            <label>z<input id="cmdZ" type="number" step="0.001" value="0.250"></label>
+            <label>roll<input id="cmdRoll" type="number" step="0.001" value="0.000"></label>
+            <label>pitch<input id="cmdPitch" type="number" step="0.001" value="1.570"></label>
+            <label>yaw<input id="cmdYaw" type="number" step="0.001" value="0.000"></label>
+            <label>gripper<input id="cmdGripper" type="number" step="0.001" value="0.000"></label>
+            <label>speed<input id="cmdSpeed" type="number" step="1" min="1" max="100" value="10"></label>
+          </div>
+          <button id="sendMoveitPoseBtn" class="primary wide" type="button">MoveIt 解算并执行</button>
+        </section>
+
+        <section>
+          <h2>当前位置微调</h2>
+          <div class="jog-grid" aria-label="当前位置微调">
+            <button type="button" data-jog-axis="x" data-jog-value="-0.1">X -0.1</button>
+            <button type="button" data-jog-axis="x" data-jog-value="0.1">X +0.1</button>
+            <button type="button" data-jog-axis="y" data-jog-value="-0.1">Y -0.1</button>
+            <button type="button" data-jog-axis="y" data-jog-value="0.1">Y +0.1</button>
+            <button type="button" data-jog-axis="z" data-jog-value="-0.1">Z -0.1</button>
+            <button type="button" data-jog-axis="z" data-jog-value="0.1">Z +0.1</button>
+          </div>
         </section>
 
         <section>
