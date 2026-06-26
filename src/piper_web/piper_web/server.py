@@ -222,7 +222,7 @@ class PiperWebNode(Node):
                 if moveit_name not in {'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7'}:
                     continue
                 valid_seed_names.append(moveit_name)
-                valid_seed_positions.append(driver_joint_to_urdf(moveit_name, position, config))
+                valid_seed_positions.append(driver_joint_to_moveit_seed(moveit_name, position, config))
 
             request.ik_request.robot_state.joint_state.name = valid_seed_names
             request.ik_request.robot_state.joint_state.position = valid_seed_positions
@@ -247,7 +247,7 @@ class PiperWebNode(Node):
         command.name = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7']
         gripper = float(payload.get('gripper', 0.0))
         command.position = [
-            urdf_joint_to_driver(name, float(joint_map.get(name, 0.0)), config)
+            moveit_joint_to_driver_command(name, float(joint_map.get(name, 0.0)), config)
             for name in command.name[:6]
         ] + [gripper]
         speed = max(1.0, min(100.0, float(payload.get('speed', 10.0))))
@@ -510,6 +510,20 @@ def urdf_joint_to_driver(name, value, config):
     direction = -1.0 if float(directions.get(name, 1.0)) < 0 else 1.0
     offset = float(offsets.get(name, 0.0))
     return (float(value) - offset) / direction
+
+
+def driver_joint_to_moveit_seed(name, value, config):
+    display = config.get('display', {}) if isinstance(config, dict) else {}
+    directions = display.get('joint_directions', {}) if isinstance(display, dict) else {}
+    direction = -1.0 if float(directions.get(name, 1.0)) < 0 else 1.0
+    return float(value) * direction
+
+
+def moveit_joint_to_driver_command(name, value, config):
+    display = config.get('display', {}) if isinstance(config, dict) else {}
+    directions = display.get('joint_directions', {}) if isinstance(display, dict) else {}
+    direction = -1.0 if float(directions.get(name, 1.0)) < 0 else 1.0
+    return float(value) / direction
 
 
 def normalize_config(config):
