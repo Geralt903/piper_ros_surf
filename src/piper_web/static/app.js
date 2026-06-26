@@ -57,8 +57,6 @@ const defaultConfig = {
 let config = structuredClone(defaultConfig);
 
 const frameOrder = ['base_link', 'link1', 'link2', 'link3', 'link4', 'link5', 'link6', 'gripper_base', 'link7', 'link8'];
-const markers = new Map();
-const linkSegments = new Map();
 const linkVisuals = new Map();
 const stlLoader = new STLLoader();
 
@@ -69,31 +67,6 @@ const base = new THREE.Mesh(
 base.rotation.x = Math.PI / 2;
 base.position.z = 0.04;
 arm.add(base);
-
-for (const frameName of frameOrder) {
-  const marker = new THREE.Mesh(
-    new THREE.SphereGeometry(frameName === 'base_link' ? 0.025 : 0.018, 24, 16),
-    new THREE.MeshStandardMaterial({
-      color: frameName.startsWith('link') ? 0xd4d8db : 0xf2b84b,
-      roughness: 0.42,
-      metalness: 0.1,
-    })
-  );
-  markers.set(frameName, marker);
-  arm.add(marker);
-}
-
-for (const joint of robotJoints) {
-  const segment = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.012, 1, 8, 16),
-    new THREE.MeshStandardMaterial({
-      color: joint.name === 'joint7' || joint.name === 'joint8' ? 0xf2b84b : 0x42c27a,
-      roughness: 0.5,
-    })
-  );
-  linkSegments.set(joint.name, segment);
-  arm.add(segment);
-}
 
 const meshColors = {
   base_link: 0x9aa7b2,
@@ -191,17 +164,6 @@ function readJointValue(name) {
     if (name === 'joint8') return -gripperValue / 2;
   }
   return 0;
-}
-
-function setSegmentBetween(segment, start, end) {
-  const direction = new THREE.Vector3().subVectors(end, start);
-  const length = direction.length();
-  segment.visible = length > 0.001;
-  if (!segment.visible) return;
-
-  segment.position.copy(start).addScaledVector(direction, 0.5);
-  segment.scale.set(1, Math.max(0.001, length), 1);
-  segment.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
 }
 
 function resize() {
@@ -355,28 +317,10 @@ function applyArmPose(delta) {
     frames.set(joint.child, childFrame);
   }
 
-  for (const [frameName, marker] of markers.entries()) {
-    const frame = frames.get(frameName);
-    if (!frame) continue;
-    marker.position.setFromMatrixPosition(frame);
-  }
-
   for (const [frameName, visual] of linkVisuals.entries()) {
     const frame = frames.get(frameName);
     if (!frame) continue;
     frame.decompose(visual.position, visual.quaternion, visual.scale);
-  }
-
-  for (const joint of robotJoints) {
-    const segment = linkSegments.get(joint.name);
-    const parentFrame = frames.get(joint.parent);
-    const childFrame = frames.get(joint.child);
-    if (!segment || !parentFrame || !childFrame) continue;
-    setSegmentBetween(
-      segment,
-      new THREE.Vector3().setFromMatrixPosition(parentFrame),
-      new THREE.Vector3().setFromMatrixPosition(childFrame),
-    );
   }
 }
 
