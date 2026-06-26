@@ -444,10 +444,10 @@ class PiperRequestHandler(BaseHTTPRequestHandler):
 def default_config():
     return {
         'display': {
-            'model_version': 3,
+            'model_version': 4,
             'joint_offsets': {
                 'joint1': 0.0,
-                'joint2': 0.0,
+                'joint2': -3.1416,
                 'joint3': 0.0,
                 'joint4': 0.0,
                 'joint5': 0.0,
@@ -526,6 +526,8 @@ def normalize_config(config):
         direction = int(directions.get(name, defaults['display']['joint_directions'][name]))
         if display_model_version < defaults['display']['model_version'] and name == 'joint8':
             direction = defaults['display']['joint_directions'][name]
+        if display_model_version < 4 and name == 'joint2':
+            normalized['display']['joint_offsets'][name] = defaults['display']['joint_offsets'][name]
         normalized['display']['joint_directions'][name] = -1 if direction < 0 else 1
 
     ik = config.get('ik', {}) if isinstance(config, dict) else {}

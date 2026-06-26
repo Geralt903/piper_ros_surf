@@ -1,7 +1,7 @@
 import * as THREE from 'https://unpkg.com/three@0.165.0/build/three.module.js';
 import { STLLoader } from 'https://unpkg.com/three@0.165.0/examples/jsm/loaders/STLLoader.js';
 
-const MODEL_VERSION = 3;
+const MODEL_VERSION = 4;
 const canvas = document.querySelector('#scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -67,7 +67,7 @@ const adjustableJoints = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joi
 const defaultConfig = {
   display: {
     model_version: MODEL_VERSION,
-    joint_offsets: Object.fromEntries(adjustableJoints.map((name) => [name, 0])),
+    joint_offsets: Object.fromEntries(adjustableJoints.map((name) => [name, name === 'joint2' ? -3.1416 : 0])),
     joint_directions: Object.fromEntries(adjustableJoints.map((name) => [name, name === 'joint2' ? -1 : 1])),
   },
   ik: {
@@ -217,6 +217,7 @@ const els = {
   cmdYaw: document.querySelector('#cmdYaw'),
   cmdGripper: document.querySelector('#cmdGripper'),
   cmdSpeed: document.querySelector('#cmdSpeed'),
+  cmdSpeedSlider: document.querySelector('#cmdSpeedSlider'),
   fillCurrentPoseBtn: document.querySelector('#fillCurrentPoseBtn'),
   sendMoveitPoseBtn: document.querySelector('#sendMoveitPoseBtn'),
   jogButtons: document.querySelectorAll('[data-jog-axis]'),
@@ -319,6 +320,16 @@ function fillCurrentPoseInputs() {
   setMessage('已填入当前末端坐标');
 }
 
+function readCommandSpeed() {
+  return Math.max(1, Math.min(100, Number(els.cmdSpeed.value) || 10));
+}
+
+function syncSpeedInputs(source) {
+  const value = Math.max(1, Math.min(100, Math.round(Number(source.value) || 10)));
+  els.cmdSpeed.value = String(value);
+  els.cmdSpeedSlider.value = String(value);
+}
+
 function computeRobotFrames() {
   const frames = new Map([[baseLinkName, new THREE.Matrix4().identity()]]);
   for (const joint of robotJoints) {
@@ -399,6 +410,7 @@ function setConfig(nextConfig) {
     for (const name of adjustableJoints) {
       config.display.joint_directions[name] = defaultConfig.display.joint_directions[name];
     }
+    config.display.joint_offsets.joint2 = defaultConfig.display.joint_offsets.joint2;
   }
   for (const name of Object.keys(defaultConfig.ik)) {
     config.ik[name] = Number(nextConfig?.ik?.[name] ?? config.ik[name]);
@@ -569,7 +581,7 @@ function readMoveitPoseCommand() {
     pitch: Number(els.cmdPitch.value) || 0,
     yaw: Number(els.cmdYaw.value) || 0,
     gripper: Number(els.cmdGripper.value) || 0,
-    speed: Number(els.cmdSpeed.value) || 10,
+    speed: readCommandSpeed(),
     avoid_collisions: true,
   };
 }
@@ -609,7 +621,7 @@ async function jogPose(axis, value) {
     dx: axis === 'x' ? value : 0,
     dy: axis === 'y' ? value : 0,
     dz: axis === 'z' ? value : 0,
-    speed: Number(els.cmdSpeed.value) || 10,
+    speed: readCommandSpeed(),
   };
 
   try {
@@ -635,6 +647,8 @@ els.enableBtn.addEventListener('click', () => setEnable(true));
 els.disableBtn.addEventListener('click', () => setEnable(false));
 els.stopCurrentBtn.addEventListener('click', stopCurrentPosition);
 els.fillCurrentPoseBtn.addEventListener('click', fillCurrentPoseInputs);
+els.cmdSpeed.addEventListener('input', () => syncSpeedInputs(els.cmdSpeed));
+els.cmdSpeedSlider.addEventListener('input', () => syncSpeedInputs(els.cmdSpeedSlider));
 els.sendMoveitPoseBtn.addEventListener('click', sendMoveitPoseCommand);
 els.jogButtons.forEach((button) => {
   button.addEventListener('click', () => {

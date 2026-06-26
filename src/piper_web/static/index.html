@@ -85,7 +85,11 @@
             <label>pitch<input id="cmdPitch" type="number" step="0.001" value="1.570"></label>
             <label>yaw<input id="cmdYaw" type="number" step="0.001" value="0.000"></label>
             <label>gripper<input id="cmdGripper" type="number" step="0.001" value="0.000"></label>
-            <label>speed<input id="cmdSpeed" type="number" step="1" min="1" max="100" value="10"></label>
+          </div>
+          <div class="speed-control">
+            <label for="cmdSpeedSlider">速度</label>
+            <input id="cmdSpeedSlider" type="range" min="1" max="100" step="1" value="10">
+            <input id="cmdSpeed" type="number" step="1" min="1" max="100" value="10">
           </div>
           <button id="sendMoveitPoseBtn" class="primary wide" type="button">MoveIt 解算并执行</button>
         </section>
