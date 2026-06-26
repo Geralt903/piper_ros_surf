@@ -95,6 +95,22 @@
         </section>
 
         <section>
+          <div class="section-head">
+            <h2>拖拽末端目标</h2>
+            <label class="toggle"><input id="dragFollowToggle" type="checkbox">跟踪</label>
+          </div>
+          <div class="drag-control">
+            <label for="dragPlaneSelect">平面</label>
+            <select id="dragPlaneSelect">
+              <option value="xy">XY</option>
+              <option value="xz" selected>XZ</option>
+              <option value="yz">YZ</option>
+            </select>
+            <button id="syncTargetBallBtn" type="button">同步当前</button>
+          </div>
+        </section>
+
+        <section>
           <h2>当前位置微调</h2>
           <div class="jog-grid" aria-label="当前位置微调">
             <button type="button" data-jog-axis="x" data-jog-value="-0.1">X -0.1</button>

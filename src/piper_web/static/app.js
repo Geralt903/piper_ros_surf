@@ -20,6 +20,22 @@ scene.add(keyLight);
 const grid = new THREE.GridHelper(5, 20, 0x3b454d, 0x252b30);
 scene.add(grid);
 
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const dragHit = new THREE.Vector3();
+const targetBall = new THREE.Mesh(
+  new THREE.SphereGeometry(0.045, 32, 16),
+  new THREE.MeshStandardMaterial({
+    color: 0xef6963,
+    emissive: 0x4a1414,
+    emissiveIntensity: 0.35,
+    roughness: 0.35,
+  })
+);
+targetBall.visible = false;
+scene.add(targetBall);
+
 const axisGroup = new THREE.Group();
 axisGroup.position.set(0, 0.02, 0);
 scene.add(axisGroup);
@@ -220,6 +236,9 @@ const els = {
   cmdSpeedSlider: document.querySelector('#cmdSpeedSlider'),
   fillCurrentPoseBtn: document.querySelector('#fillCurrentPoseBtn'),
   sendMoveitPoseBtn: document.querySelector('#sendMoveitPoseBtn'),
+  dragFollowToggle: document.querySelector('#dragFollowToggle'),
+  dragPlaneSelect: document.querySelector('#dragPlaneSelect'),
+  syncTargetBallBtn: document.querySelector('#syncTargetBallBtn'),
   jogButtons: document.querySelectorAll('[data-jog-axis]'),
   calibrationList: document.querySelector('#calibrationList'),
   ikList: document.querySelector('#ikList'),
@@ -233,6 +252,11 @@ let latestPositions = [0, 0, 0, 0, 0, 0, 0];
 let targetPositions = [...latestPositions];
 let jointNames = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'gripper'];
 let latestEndPose = null;
+let targetBallPose = null;
+let draggingTarget = false;
+let targetMoveInFlight = false;
+let targetMovePending = false;
+let lastTargetMoveTime = 0;
 let busy = false;
 
 function makeOriginMatrix(joint) {
@@ -307,6 +331,26 @@ function formatPosePosition(position) {
   return `x ${Number(position.x).toFixed(3)}  y ${Number(position.y).toFixed(3)}  z ${Number(position.z).toFixed(3)} m`;
 }
 
+function eulerFromQuaternion(q) {
+  const x = Number(q?.x) || 0;
+  const y = Number(q?.y) || 0;
+  const z = Number(q?.z) || 0;
+  const w = Number(q?.w) || 1;
+
+  const sinrCosp = 2 * (w * x + y * z);
+  const cosrCosp = 1 - 2 * (x * x + y * y);
+  const roll = Math.atan2(sinrCosp, cosrCosp);
+
+  const sinp = 2 * (w * y - z * x);
+  const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp) * Math.PI / 2 : Math.asin(sinp);
+
+  const sinyCosp = 2 * (w * z + x * y);
+  const cosyCosp = 1 - 2 * (y * y + z * z);
+  const yaw = Math.atan2(sinyCosp, cosyCosp);
+
+  return { roll, pitch, yaw };
+}
+
 function fillCurrentPoseInputs() {
   const position = latestEndPose?.position;
   if (!position) {
@@ -317,7 +361,42 @@ function fillCurrentPoseInputs() {
   els.cmdX.value = Number(position.x).toFixed(3);
   els.cmdY.value = Number(position.y).toFixed(3);
   els.cmdZ.value = Number(position.z).toFixed(3);
-  setMessage('已填入当前末端坐标');
+  if (latestEndPose?.orientation) {
+    const euler = eulerFromQuaternion(latestEndPose.orientation);
+    els.cmdRoll.value = euler.roll.toFixed(3);
+    els.cmdPitch.value = euler.pitch.toFixed(3);
+    els.cmdYaw.value = euler.yaw.toFixed(3);
+    setMessage('已填入当前末端坐标和姿态');
+  } else {
+    setMessage('已填入当前末端坐标');
+  }
+}
+
+function syncTargetBallToPose(pose = latestEndPose) {
+  const position = pose?.position;
+  if (!position) {
+    setMessage('还没有末端坐标反馈', true);
+    return false;
+  }
+
+  targetBall.position.set(Number(position.x) || 0, Number(position.z) || 0, -(Number(position.y) || 0));
+  targetBall.visible = true;
+  targetBallPose = {
+    x: Number(position.x) || 0,
+    y: Number(position.y) || 0,
+    z: Number(position.z) || 0,
+  };
+  return true;
+}
+
+function setTargetInputsFromBall() {
+  const x = targetBall.position.x;
+  const y = -targetBall.position.z;
+  const z = targetBall.position.y;
+  targetBallPose = { x, y, z };
+  els.cmdX.value = x.toFixed(3);
+  els.cmdY.value = y.toFixed(3);
+  els.cmdZ.value = z.toFixed(3);
 }
 
 function readCommandSpeed() {
@@ -328,6 +407,45 @@ function syncSpeedInputs(source) {
   const value = Math.max(1, Math.min(100, Math.round(Number(source.value) || 10)));
   els.cmdSpeed.value = String(value);
   els.cmdSpeedSlider.value = String(value);
+}
+
+function updatePointer(event) {
+  const rect = canvas.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
+  pointer.y = -(((event.clientY - rect.top) / Math.max(1, rect.height)) * 2 - 1);
+}
+
+function setDragPlane() {
+  const value = els.dragPlaneSelect.value;
+  if (value === 'xy') {
+    dragPlane.normal.set(0, 1, 0);
+    dragPlane.constant = -targetBall.position.y;
+  } else if (value === 'yz') {
+    dragPlane.normal.set(1, 0, 0);
+    dragPlane.constant = -targetBall.position.x;
+  } else {
+    dragPlane.normal.set(0, 0, 1);
+    dragPlane.constant = -targetBall.position.z;
+  }
+}
+
+function readTargetBallCommand() {
+  const command = readMoveitPoseCommand();
+  const pose = targetBallPose ?? {
+    x: Number(els.cmdX.value) || 0,
+    y: Number(els.cmdY.value) || 0,
+    z: Number(els.cmdZ.value) || 0,
+  };
+  command.x = pose.x;
+  command.y = pose.y;
+  command.z = pose.z;
+  if (latestEndPose?.orientation) {
+    command.qx = Number(latestEndPose.orientation.x) || 0;
+    command.qy = Number(latestEndPose.orientation.y) || 0;
+    command.qz = Number(latestEndPose.orientation.z) || 0;
+    command.qw = Number(latestEndPose.orientation.w) || 1;
+  }
+  return command;
 }
 
 function computeRobotFrames() {
@@ -510,6 +628,9 @@ async function refreshState() {
     els.motionStatus.textContent = status.motion_status ?? '--';
     els.errCode.textContent = status.err_code ?? '--';
     latestEndPose = data.end_pose ?? latestEndPose;
+    if (!targetBall.visible && latestEndPose?.position) {
+      syncTargetBallToPose(latestEndPose);
+    }
     els.feedbackPose.textContent = formatPosePosition(data.end_pose?.position);
     drawJoints();
   } catch (error) {
@@ -570,7 +691,7 @@ async function stopCurrentPosition() {
 }
 
 function readMoveitPoseCommand() {
-  return {
+  const command = {
     frame_id: 'base_link',
     group_name: 'arm',
     ik_link_name: 'link6',
@@ -584,6 +705,8 @@ function readMoveitPoseCommand() {
     speed: readCommandSpeed(),
     avoid_collisions: true,
   };
+
+  return command;
 }
 
 async function sendMoveitPoseCommand() {
@@ -607,6 +730,91 @@ async function sendMoveitPoseCommand() {
     busy = false;
     els.sendMoveitPoseBtn.disabled = false;
   }
+}
+
+async function sendTargetBallMove() {
+  if (!targetBallPose || targetMoveInFlight) {
+    targetMovePending = Boolean(targetBallPose);
+    return;
+  }
+
+  targetMoveInFlight = true;
+  lastTargetMoveTime = performance.now();
+  try {
+    const response = await fetch('/api/moveit_pose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(readTargetBallCommand()),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || data.message || `HTTP ${response.status}`);
+    setMessage('目标球 MoveIt 命令已发送');
+  } catch (error) {
+    setMessage(`目标球跟踪失败: ${error.message}`, true);
+  } finally {
+    targetMoveInFlight = false;
+    if (targetMovePending) {
+      targetMovePending = false;
+      const delay = Math.max(0, 350 - (performance.now() - lastTargetMoveTime));
+      window.setTimeout(sendTargetBallMove, delay);
+    }
+  }
+}
+
+function requestTargetBallMove(force = false) {
+  if (!targetBallPose) return;
+  if (!force && !els.dragFollowToggle.checked) return;
+  if (targetMoveInFlight) {
+    targetMovePending = true;
+    return;
+  }
+
+  const elapsed = performance.now() - lastTargetMoveTime;
+  if (!force && elapsed < 350) {
+    targetMovePending = true;
+    window.setTimeout(() => {
+      if (targetMovePending && !targetMoveInFlight) {
+        targetMovePending = false;
+        sendTargetBallMove();
+      }
+    }, 350 - elapsed);
+    return;
+  }
+
+  sendTargetBallMove();
+}
+
+function onCanvasPointerDown(event) {
+  if (!targetBall.visible) syncTargetBallToPose();
+  updatePointer(event);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(targetBall, false);
+  if (!hits.length) return;
+
+  draggingTarget = true;
+  canvas.setPointerCapture(event.pointerId);
+  setDragPlane();
+  event.preventDefault();
+}
+
+function onCanvasPointerMove(event) {
+  if (!draggingTarget) return;
+  updatePointer(event);
+  raycaster.setFromCamera(pointer, camera);
+  if (!raycaster.ray.intersectPlane(dragPlane, dragHit)) return;
+
+  targetBall.position.copy(dragHit);
+  setTargetInputsFromBall();
+  requestTargetBallMove(false);
+}
+
+function onCanvasPointerUp(event) {
+  if (!draggingTarget) return;
+  draggingTarget = false;
+  if (canvas.hasPointerCapture(event.pointerId)) {
+    canvas.releasePointerCapture(event.pointerId);
+  }
+  requestTargetBallMove(true);
 }
 
 async function jogPose(axis, value) {
@@ -650,6 +858,16 @@ els.fillCurrentPoseBtn.addEventListener('click', fillCurrentPoseInputs);
 els.cmdSpeed.addEventListener('input', () => syncSpeedInputs(els.cmdSpeed));
 els.cmdSpeedSlider.addEventListener('input', () => syncSpeedInputs(els.cmdSpeedSlider));
 els.sendMoveitPoseBtn.addEventListener('click', sendMoveitPoseCommand);
+els.syncTargetBallBtn.addEventListener('click', () => {
+  if (syncTargetBallToPose()) {
+    fillCurrentPoseInputs();
+    setMessage('目标球已同步到当前末端');
+  }
+});
+canvas.addEventListener('pointerdown', onCanvasPointerDown);
+canvas.addEventListener('pointermove', onCanvasPointerMove);
+canvas.addEventListener('pointerup', onCanvasPointerUp);
+canvas.addEventListener('pointercancel', onCanvasPointerUp);
 els.jogButtons.forEach((button) => {
   button.addEventListener('click', () => {
     jogPose(button.dataset.jogAxis, Number(button.dataset.jogValue) || 0);
