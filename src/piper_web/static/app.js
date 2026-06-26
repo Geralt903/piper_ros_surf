@@ -217,6 +217,7 @@ const els = {
   cmdYaw: document.querySelector('#cmdYaw'),
   cmdGripper: document.querySelector('#cmdGripper'),
   cmdSpeed: document.querySelector('#cmdSpeed'),
+  fillCurrentPoseBtn: document.querySelector('#fillCurrentPoseBtn'),
   sendMoveitPoseBtn: document.querySelector('#sendMoveitPoseBtn'),
   jogButtons: document.querySelectorAll('[data-jog-axis]'),
   calibrationList: document.querySelector('#calibrationList'),
@@ -230,6 +231,7 @@ const els = {
 let latestPositions = [0, 0, 0, 0, 0, 0, 0];
 let targetPositions = [...latestPositions];
 let jointNames = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'gripper'];
+let latestEndPose = null;
 let busy = false;
 
 function makeOriginMatrix(joint) {
@@ -302,6 +304,19 @@ function drawJoints() {
 function formatPosePosition(position) {
   if (!position) return '--';
   return `x ${Number(position.x).toFixed(3)}  y ${Number(position.y).toFixed(3)}  z ${Number(position.z).toFixed(3)} m`;
+}
+
+function fillCurrentPoseInputs() {
+  const position = latestEndPose?.position;
+  if (!position) {
+    setMessage('还没有末端坐标反馈', true);
+    return;
+  }
+
+  els.cmdX.value = Number(position.x).toFixed(3);
+  els.cmdY.value = Number(position.y).toFixed(3);
+  els.cmdZ.value = Number(position.z).toFixed(3);
+  setMessage('已填入当前末端坐标');
 }
 
 function computeRobotFrames() {
@@ -482,6 +497,7 @@ async function refreshState() {
     els.armStatus.textContent = status.arm_status ?? '--';
     els.motionStatus.textContent = status.motion_status ?? '--';
     els.errCode.textContent = status.err_code ?? '--';
+    latestEndPose = data.end_pose ?? latestEndPose;
     els.feedbackPose.textContent = formatPosePosition(data.end_pose?.position);
     drawJoints();
   } catch (error) {
@@ -618,6 +634,7 @@ async function jogPose(axis, value) {
 els.enableBtn.addEventListener('click', () => setEnable(true));
 els.disableBtn.addEventListener('click', () => setEnable(false));
 els.stopCurrentBtn.addEventListener('click', stopCurrentPosition);
+els.fillCurrentPoseBtn.addEventListener('click', fillCurrentPoseInputs);
 els.sendMoveitPoseBtn.addEventListener('click', sendMoveitPoseCommand);
 els.jogButtons.forEach((button) => {
   button.addEventListener('click', () => {
