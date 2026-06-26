@@ -174,6 +174,15 @@ echo_status() {
   ros_exec "ros2 topic echo /arm_status"
 }
 
+launch_web_monitor() {
+  ensure_container
+  echo "启动网页状态预览。"
+  echo "浏览器打开：http://localhost:8080"
+  echo "如端口被占用，可用 WEB_PORT=8081 scripts/piper_cn.sh 后再启动。"
+  echo
+  ros_exec "ros2 run piper_web piper_web --host 0.0.0.0 --port ${WEB_PORT:-8080}"
+}
+
 enable_arm() {
   echo "准备使能机械臂。请确认机械臂工作范围内无人、无障碍物。"
   read -r -p "确认使能请输入 yes： " answer
@@ -210,9 +219,10 @@ main_menu() {
     echo "5) 启动机械臂控制节点（不自动使能）"
     echo "6) 查看关节反馈 /joint_states_single"
     echo "7) 查看机械臂状态 /arm_status"
-    echo "8) 使能机械臂"
-    echo "9) 失能机械臂"
-    echo "10) 停止 Humble 容器"
+    echo "8) 启动网页状态预览（http://localhost:${WEB_PORT:-8080}）"
+    echo "9) 使能机械臂"
+    echo "10) 失能机械臂"
+    echo "11) 停止 Humble 容器"
     echo "0) 退出"
     echo
     if [ -n "${PENDING_CHOICE}" ]; then
@@ -232,9 +242,10 @@ main_menu() {
       5) launch_arm; pause ;;
       6) echo_joint; pause ;;
       7) echo_status; pause ;;
-      8) enable_arm; pause ;;
-      9) disable_arm; pause ;;
-      10) stop_container; pause ;;
+      8) launch_web_monitor; pause ;;
+      9) enable_arm; pause ;;
+      10) disable_arm; pause ;;
+      11) stop_container; pause ;;
       0) exit 0 ;;
       *) echo "无效选择。"; pause ;;
     esac

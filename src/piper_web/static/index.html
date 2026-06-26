@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Piper Web Monitor</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="viewport" aria-label="Piper 3D 状态预览">
+        <canvas id="scene"></canvas>
+        <div class="hud">
+          <div>
+            <span class="label">ROS</span>
+            <strong id="rosState">等待数据</strong>
+          </div>
+          <div>
+            <span class="label">延迟</span>
+            <strong id="age">--</strong>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <header>
+          <h1>Piper 状态</h1>
+          <div id="serviceBadge" class="badge">服务检查中</div>
+        </header>
+
+        <div class="actions">
+          <button id="enableBtn" class="primary" type="button">使能</button>
+          <button id="disableBtn" type="button">失能</button>
+        </div>
+
+        <section class="status-grid" aria-label="机械臂状态">
+          <div>
+            <span>控制模式</span>
+            <strong id="ctrlMode">--</strong>
+          </div>
+          <div>
+            <span>臂状态</span>
+            <strong id="armStatus">--</strong>
+          </div>
+          <div>
+            <span>运动状态</span>
+            <strong id="motionStatus">--</strong>
+          </div>
+          <div>
+            <span>错误码</span>
+            <strong id="errCode">--</strong>
+          </div>
+        </section>
+
+        <section>
+          <h2>关节角度</h2>
+          <div id="jointList" class="joint-list"></div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <h2>显示校准</h2>
+            <button id="zeroCurrentBtn" class="small" type="button">当前为零</button>
+          </div>
+          <div id="calibrationList" class="calibration-list"></div>
+        </section>
+
+        <section>
+          <h2>IK 参数</h2>
+          <div id="ikList" class="ik-list"></div>
+        </section>
+
+        <div class="actions">
+          <button id="saveConfigBtn" class="primary" type="button">保存参数</button>
+          <button id="resetConfigBtn" type="button">恢复默认</button>
+        </div>
+
+        <div id="message" class="message"></div>
+      </aside>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
