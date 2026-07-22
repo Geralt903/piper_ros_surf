@@ -1,0 +1,55 @@
+<launch>
+  <arg name="viewer" default="false"/>
+  <arg name="demo" default="true"/>
+  <arg name="rate_hz" default="200"/>
+  <arg name="hold_time" default="3.0"/>
+  <arg name="kp" default="140.0"/>
+  <arg name="kd" default="18.0"/>
+  <arg name="ee_body" default="link6"/>
+  <arg name="xml_path" default="$(find piper_description)/mujoco_model/piper_wall_mount_description.xml"/>
+  <arg name="urdf_path" default="$(find piper_description)/urdf/piper_description.urdf"/>
+  <arg name="publish_tf" default="false"/>
+  <arg name="web" default="true"/>
+  <arg name="web_port" default="8088"/>
+  <arg name="camera_name" default="hand_camera"/>
+  <arg name="publish_camera_image" default="false"/>
+  <arg name="camera_width" default="320"/>
+  <arg name="camera_height" default="240"/>
+  <arg name="camera_rate_hz" default="10"/>
+
+  <param name="robot_description" textfile="$(arg urdf_path)"/>
+
+  <node name="long_arm_static_mujoco_ros"
+        pkg="piper_mujoco"
+        type="long_arm_static_mujoco_ros.py"
+        output="screen">
+    <param name="viewer" value="$(arg viewer)"/>
+    <param name="demo" value="$(arg demo)"/>
+    <param name="rate_hz" value="$(arg rate_hz)"/>
+    <param name="hold_time" value="$(arg hold_time)"/>
+    <param name="kp" value="$(arg kp)"/>
+    <param name="kd" value="$(arg kd)"/>
+    <param name="ee_body" value="$(arg ee_body)"/>
+    <param name="xml_path" value="$(arg xml_path)"/>
+    <param name="urdf_path" value="$(arg urdf_path)"/>
+    <param name="camera_name" value="$(arg camera_name)"/>
+    <param name="publish_camera_image" value="$(arg publish_camera_image)"/>
+    <param name="camera_width" value="$(arg camera_width)"/>
+    <param name="camera_height" value="$(arg camera_height)"/>
+    <param name="camera_rate_hz" value="$(arg camera_rate_hz)"/>
+  </node>
+
+  <node name="robot_state_publisher"
+        pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        output="screen"
+        if="$(arg publish_tf)"/>
+
+  <node name="piper_mujoco_web_bridge"
+        pkg="piper_mujoco"
+        type="piper_mujoco_web_bridge.py"
+        output="screen"
+        if="$(arg web)">
+    <param name="port" value="$(arg web_port)"/>
+  </node>
+</launch>

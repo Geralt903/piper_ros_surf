@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(piper_mujoco)
 
-find_package(catkin REQUIRED COMPONENTS rospy std_msgs)
+find_package(catkin REQUIRED COMPONENTS rospy std_msgs sensor_msgs geometry_msgs)
 
 catkin_package(
-  CATKIN_DEPENDS rospy std_msgs
+  CATKIN_DEPENDS rospy std_msgs sensor_msgs geometry_msgs
 )
 
 include_directories(${catkin_INCLUDE_DIRS})
@@ -14,5 +14,7 @@ catkin_install_python(PROGRAMS
   scripts/piper_no_gripper_mujoco_ros.py
   scripts/piper_mujoco_ros.py
   scripts/piper_mujoco_pid.py
+  scripts/long_arm_static_mujoco_ros.py
+  scripts/piper_mujoco_web_bridge.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

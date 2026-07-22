@@ -1,0 +1,42 @@
+services:
+  long_arm_mujoco_ros:
+    build:
+      context: .
+      dockerfile: docker/ros_mujoco/Dockerfile
+    image: piper-ros-mujoco:noetic
+    network_mode: host
+    ipc: host
+    environment:
+      DISPLAY: ${DISPLAY}
+      QT_X11_NO_MITSHM: "1"
+      MUJOCO_GL: ${MUJOCO_GL:-osmesa}
+      LIBGL_ALWAYS_SOFTWARE: ${LIBGL_ALWAYS_SOFTWARE:-1}
+      MESA_LOADER_DRIVER_OVERRIDE: ${MESA_LOADER_DRIVER_OVERRIDE:-llvmpipe}
+      __GLX_VENDOR_LIBRARY_NAME: ${__GLX_VENDOR_LIBRARY_NAME:-mesa}
+      VIEWER: ${VIEWER:-false}
+      DEMO: ${DEMO:-true}
+      ROS_MASTER_URI: http://localhost:${ROS_PORT:-11312}
+      PUBLISH_TF: ${PUBLISH_TF:-false}
+      WEB: ${WEB:-true}
+      WEB_PORT: ${WEB_PORT:-8088}
+      PUBLISH_CAMERA_IMAGE: ${PUBLISH_CAMERA_IMAGE:-false}
+      CAMERA_WIDTH: ${CAMERA_WIDTH:-320}
+      CAMERA_HEIGHT: ${CAMERA_HEIGHT:-240}
+      CAMERA_RATE_HZ: ${CAMERA_RATE_HZ:-10}
+    volumes:
+      - .:/ws
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    working_dir: /ws
+    command: >
+      bash -lc "catkin_make --only-pkg-with-deps piper_description piper_mujoco &&
+      source devel/setup.bash &&
+      roslaunch -p ${ROS_PORT:-11312} piper_mujoco long_arm_static_mujoco.launch
+      viewer:=${VIEWER:-false}
+      demo:=${DEMO:-true}
+      publish_tf:=${PUBLISH_TF:-false}
+      web:=${WEB:-true}
+      web_port:=${WEB_PORT:-8088}
+      publish_camera_image:=${PUBLISH_CAMERA_IMAGE:-false}
+      camera_width:=${CAMERA_WIDTH:-320}
+      camera_height:=${CAMERA_HEIGHT:-240}
+      camera_rate_hz:=${CAMERA_RATE_HZ:-10}"
