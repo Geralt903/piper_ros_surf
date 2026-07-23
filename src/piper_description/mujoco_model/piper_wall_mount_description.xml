@@ -16,10 +16,10 @@
     <worldbody>
         <geom name="mount_wall" type="box" pos="-0.035 0 0.70" size="0.03 0.80 0.80" rgba="0.45 0.48 0.50 1" contype="0" conaffinity="0" />
         <geom name="wall_back_plate" type="box" pos="-0.005 0 0.70" size="0.012 0.18 0.18" rgba="0.14 0.17 0.20 1" contype="0" conaffinity="0" />
-        <body name="left_eye_observer" pos="0.18 0.65 0.82">
+        <body name="left_eye_observer" pos="0.02 0.18 0.82">
             <geom name="left_eye_camera_body" type="sphere" size="0.025" rgba="0.02 0.02 0.02 1" contype="0" conaffinity="0" />
-            <light name="left_eye_key_light" pos="0 0 0" dir="0 -1 -0.15" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" />
-            <camera name="left_eye_camera" pos="0 0 0" xyaxes="-1 0 0 0 0 1" fovy="70" />
+            <light name="left_eye_key_light" pos="0 0 0" dir="1 0 -0.15" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2" />
+            <camera name="left_eye_camera" pos="0 0 0" xyaxes="0 -1 0 0 0 1" fovy="80" />
             <site name="left_eye_camera_frame" pos="0 0 0" size="0.01" rgba="0.1 0.4 1.0 1" />
         </body>
         <body name="wall_mount" pos="0 0 0.70" quat="0.7071068 0 0.7071068 0">
