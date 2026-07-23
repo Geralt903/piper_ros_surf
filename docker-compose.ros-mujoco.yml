@@ -16,6 +16,8 @@ services:
       VIEWER: ${VIEWER:-false}
       DEMO: ${DEMO:-true}
       ROS_MASTER_URI: http://localhost:${ROS_PORT:-11312}
+      ROS_HOSTNAME: ${ROS_HOSTNAME:-localhost}
+      ROS_IP: ${ROS_IP:-127.0.0.1}
       PUBLISH_TF: ${PUBLISH_TF:-false}
       WEB: ${WEB:-true}
       WEB_PORT: ${WEB_PORT:-8088}

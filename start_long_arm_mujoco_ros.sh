@@ -10,6 +10,8 @@ SERVICE="long_arm_mujoco_ros"
 PROJECT="${PROJECT:-piper_ros_runtime}"
 ROS_PORT="${ROS_PORT:-11312}"
 ROS_MASTER_URI="http://localhost:${ROS_PORT}"
+ROS_HOSTNAME="${ROS_HOSTNAME:-localhost}"
+ROS_IP="${ROS_IP:-127.0.0.1}"
 MUJOCO_GL="${MUJOCO_GL:-osmesa}"
 BASE_MUJOCO_GL="${MUJOCO_GL}"
 PUBLISH_TF="${PUBLISH_TF:-false}"
@@ -28,6 +30,8 @@ compose() {
   COMPOSE_PROJECT_NAME="${PROJECT}" \
   ROS_PORT="${ROS_PORT}" \
   ROS_MASTER_URI="${ROS_MASTER_URI}" \
+  ROS_HOSTNAME="${ROS_HOSTNAME}" \
+  ROS_IP="${ROS_IP}" \
   MUJOCO_GL="${MUJOCO_GL}" \
   PUBLISH_TF="${PUBLISH_TF}" \
   WEB="${WEB}" \
@@ -191,6 +195,7 @@ print_banner() {
   模式:        ${mode}
   Docker项目: ${PROJECT}
   ROS master: ${ROS_MASTER_URI}
+  ROS host:   ${ROS_HOSTNAME} (${ROS_IP})
   MuJoCo GL:  ${MUJOCO_GL}
   原生界面:    ${VIEWER}
   发布 /tf:    ${PUBLISH_TF}
