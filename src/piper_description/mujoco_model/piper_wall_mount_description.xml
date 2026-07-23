@@ -49,9 +49,10 @@
                                     <joint name="joint6" pos="0 0 0" axis="0 0 1" limited="true" range="-2.0944 2.0944" damping="5"/>
                                     <geom type="mesh" rgba="0.898039 0.917647 0.929412 1" mesh="link6" />
                                     <geom type="mesh" rgba="0.792157 0.819608 0.933333 1" mesh="gripper_base" />
-                                    <geom name="hand_camera_body" type="box" pos="0.035 0 0.095" size="0.018 0.014 0.012" rgba="0.05 0.05 0.05 1" contype="0" conaffinity="0" />
+                                    <geom name="hand_depth_camera_body" type="box" pos="0.035 0 0.095" size="0.018 0.014 0.012" rgba="0.03 0.08 0.11 1" contype="0" conaffinity="0" />
+                                    <camera name="hand_depth_camera" pos="0.035 0 0.105" euler="0 1.5708 0" fovy="70" />
                                     <camera name="hand_camera" pos="0.035 0 0.105" euler="0 1.5708 0" fovy="70" />
-                                    <site name="hand_camera_frame" pos="0.035 0 0.105" euler="0 1.5708 0" size="0.008" rgba="0.1 0.8 0.2 1" />
+                                    <site name="hand_depth_camera_frame" pos="0.035 0 0.105" euler="0 1.5708 0" size="0.008" rgba="0.1 0.8 0.2 1" />
                                     <body name="link7" pos="0 0 0.1358" quat="0.707105 0.707108 0 0">
                                         <inertial pos="0.000651232 -0.049193 0.00972259" quat="0.477798 0.572974 -0.518028 0.418398" mass="0.025" diaginertia="7.74531e-05 7.36783e-05 5.0886e-06" />
                                         <joint name="joint7" pos="0 0 0" axis="0 0 1" type="slide" limited="true" range="0 0.035" damping="100"/>

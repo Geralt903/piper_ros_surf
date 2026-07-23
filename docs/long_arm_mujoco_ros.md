@@ -66,13 +66,13 @@ __GLX_VENDOR_LIBRARY_NAME=mesa
 ./start_long_arm_mujoco_ros.sh demo-tf
 ```
 
-如果要发布手部相机图像 topic：
+如果要发布末端深度相机图像 topic：
 
 ```bash
 ./start_long_arm_mujoco_ros.sh camera
 ```
 
-这会额外发布 `/long_arm/hand_camera/image_raw`。不需要图像时，普通 `control` 仍只发布相机位姿，开销更小。
+这会额外发布 `/long_arm/tool_camera/depth/image_raw`。不需要图像时，普通 `control` 仍只发布相机位姿，开销更小。
 
 ## ROS 通讯
 
@@ -80,7 +80,7 @@ __GLX_VENDOR_LIBRARY_NAME=mesa
 
 ```bash
 ./start_long_arm_mujoco_ros.sh start     # MuJoCo界面 + ROS/前端控制
-./start_long_arm_mujoco_ros.sh camera    # 手部相机图像
+./start_long_arm_mujoco_ros.sh camera    # 末端深度相机图像
 ./start_long_arm_mujoco_ros.sh status    # 检查状态
 ./start_long_arm_mujoco_ros.sh open      # 张开夹爪
 ./start_long_arm_mujoco_ros.sh close     # 闭合夹爪
@@ -141,13 +141,15 @@ wrench:
 - `/joint_states`：当前关节角、速度和电机力矩。
 - `/long_arm/gripper_target`：夹爪开合目标，`std_msgs/Float64`。
 - `/long_arm/end_effector_pose`：末端世界坐标位姿。
-- `/long_arm/hand_camera_pose`：手部相机世界坐标位姿。
-- `/long_arm/hand_camera/image_raw`：手部相机图像，只有 `camera-control` 或 `PUBLISH_CAMERA_IMAGE=true` 时发布。
+- `/long_arm/hand_camera_pose`：左侧观察相机世界坐标位姿，兼容旧接口命名。
+- `/long_arm/hand_camera/image_raw`：左侧观察相机 RGB 图像，只有 `camera-control` 或 `PUBLISH_CAMERA_IMAGE=true` 时发布。
+- `/long_arm/tool_camera_pose`：末端深度相机世界坐标位姿。
+- `/long_arm/tool_camera/depth/image_raw`：末端深度相机图像，编码为 `32FC1`，单位为米。
 - `/long_arm/stability`：`[com_x, com_y, com_z, cop_x, support_margin, total_mass]`。
 
-## 手部摄像头
+## 末端深度相机
 
-MuJoCo 模型中已经在 `link6` 上加入了 `hand_camera` 和一个小的相机外壳 geom。相机 pose 随仿真发布到 `/long_arm/hand_camera_pose`。
+MuJoCo 模型中已经在 `link6` 上加入了 `hand_depth_camera` 和一个小的深度相机外壳 geom。相机 pose 随仿真发布到 `/long_arm/tool_camera_pose`，深度图发布到 `/long_arm/tool_camera/depth/image_raw`。`hand_camera` 仍作为同位姿兼容相机保留在模型中。
 
 要接真实视觉链路时，推荐保持 topic 名不变：
 

@@ -117,7 +117,7 @@ class PiperMujocoRos:
         self.gripper_open = float(rospy.get_param("~gripper_open", 0.030))
         self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.0))
         self.camera_name = rospy.get_param("~camera_name", "left_eye_camera")
-        self.tool_camera_name = rospy.get_param("~tool_camera_name", "hand_camera")
+        self.tool_camera_name = rospy.get_param("~tool_camera_name", "hand_depth_camera")
         self.publish_camera_image_enabled = bool(rospy.get_param("~publish_camera_image", False))
         self.camera_width = int(rospy.get_param("~camera_width", 320))
         self.camera_height = int(rospy.get_param("~camera_height", 240))
@@ -175,7 +175,7 @@ class PiperMujocoRos:
         self.camera_pose_pub = rospy.Publisher("/long_arm/hand_camera_pose", PoseStamped, queue_size=10)
         self.camera_image_pub = rospy.Publisher("/long_arm/hand_camera/image_raw", Image, queue_size=2)
         self.tool_camera_pose_pub = rospy.Publisher("/long_arm/tool_camera_pose", PoseStamped, queue_size=10)
-        self.tool_camera_image_pub = rospy.Publisher("/long_arm/tool_camera/image_raw", Image, queue_size=2)
+        self.tool_camera_image_pub = rospy.Publisher("/long_arm/tool_camera/depth/image_raw", Image, queue_size=2)
 
         rospy.loginfo("Loaded real Piper MuJoCo model: %s", xml_path)
         rospy.loginfo("Published real URDF to /robot_description: %s", urdf_path)
@@ -183,7 +183,7 @@ class PiperMujocoRos:
         if self.camera_id is not None:
             rospy.loginfo("MuJoCo observer camera: %s", self.camera_name)
         if self.tool_camera_id is not None:
-            rospy.loginfo("MuJoCo hand camera: %s", self.tool_camera_name)
+            rospy.loginfo("MuJoCo hand depth camera: %s", self.tool_camera_name)
 
     def publish_robot_description(self, urdf_path):
         with open(urdf_path, "r") as f:
@@ -414,7 +414,7 @@ class PiperMujocoRos:
             return
         self.last_camera_pub = now.to_sec()
         self.publish_camera_image(self.camera_id, self.camera_name, self.camera_image_pub, now)
-        self.publish_camera_image(self.tool_camera_id, self.tool_camera_name, self.tool_camera_image_pub, now)
+        self.publish_camera_depth(self.tool_camera_id, self.tool_camera_name, self.tool_camera_image_pub, now)
 
     def publish_camera_image(self, camera_id, camera_name, image_pub, now):
         if camera_id is None:
@@ -432,12 +432,41 @@ class PiperMujocoRos:
         image_msg.data = image.tobytes()
         image_pub.publish(image_msg)
 
+    def publish_camera_depth(self, camera_id, camera_name, image_pub, now):
+        if camera_id is None:
+            return
+        depth = self.render_camera_depth(camera_name)
+        if depth is None:
+            return
+        depth = np.asarray(depth, dtype=np.float32)
+        image_msg = Image()
+        image_msg.header = Header(stamp=now, frame_id=camera_name)
+        image_msg.height = int(depth.shape[0])
+        image_msg.width = int(depth.shape[1])
+        image_msg.encoding = "32FC1"
+        image_msg.is_bigendian = 0
+        image_msg.step = int(depth.shape[1] * 4)
+        image_msg.data = depth.tobytes()
+        image_pub.publish(image_msg)
+
     def render_camera_image(self, camera_name):
         try:
+            self.camera_renderer.disable_depth_rendering()
             self.camera_renderer.update_scene(self.data, camera=camera_name)
             return self.camera_renderer.render()
         except Exception as exc:
             rospy.logwarn_throttle(5.0, "Could not render %s image: %s", camera_name, exc)
+            return None
+
+    def render_camera_depth(self, camera_name):
+        try:
+            self.camera_renderer.enable_depth_rendering()
+            self.camera_renderer.update_scene(self.data, camera=camera_name)
+            depth = self.camera_renderer.render().copy()
+            self.camera_renderer.disable_depth_rendering()
+            return depth
+        except Exception as exc:
+            rospy.logwarn_throttle(5.0, "Could not render %s depth image: %s", camera_name, exc)
             return None
 
     def step_once(self):

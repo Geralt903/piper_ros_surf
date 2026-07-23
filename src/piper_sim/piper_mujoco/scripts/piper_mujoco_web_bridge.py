@@ -115,7 +115,7 @@ INDEX_HTML = """<!doctype html>
           <canvas id="camera_view" width="320" height="240"></canvas>
         </div>
         <div class="camera-panel">
-          <h2>Hand Camera</h2>
+          <h2>Hand Depth Camera</h2>
           <canvas id="tool_camera_view" width="320" height="240"></canvas>
         </div>
       </div>
@@ -128,8 +128,8 @@ INDEX_HTML = """<!doctype html>
         <div>End effector</div><div id="ee"></div>
         <div>Left eye pose</div><div id="camera"></div>
         <div>Left eye image</div><div id="camera_image_state"></div>
-        <div>Hand camera pose</div><div id="tool_camera"></div>
-        <div>Hand camera image</div><div id="tool_camera_image_state"></div>
+        <div>Hand depth pose</div><div id="tool_camera"></div>
+        <div>Hand depth image</div><div id="tool_camera_image_state"></div>
         <div>Stability</div><div id="stability"></div>
       </div>
       <h2>Raw State</h2>
@@ -266,7 +266,7 @@ INDEX_HTML = """<!doctype html>
     function fmt(v) { return Number(v || 0).toFixed(3); }
     function drawCameraImage(canvasId, statusId, image) {
       const status = document.getElementById(statusId);
-      if (!image.data || image.encoding !== 'rgb8') {
+      if (!image.data || (image.encoding !== 'rgb8' && image.encoding !== '32FC1')) {
         status.textContent = 'waiting';
         return;
       }
@@ -277,11 +277,35 @@ INDEX_HTML = """<!doctype html>
       }
       const bytes = Uint8Array.from(atob(image.data), c => c.charCodeAt(0));
       const rgba = new Uint8ClampedArray(image.width * image.height * 4);
-      for (let i = 0, j = 0; i < bytes.length; i += 3, j += 4) {
-        rgba[j] = bytes[i];
-        rgba[j + 1] = bytes[i + 1];
-        rgba[j + 2] = bytes[i + 2];
-        rgba[j + 3] = 255;
+      if (image.encoding === 'rgb8') {
+        for (let i = 0, j = 0; i < bytes.length; i += 3, j += 4) {
+          rgba[j] = bytes[i];
+          rgba[j + 1] = bytes[i + 1];
+          rgba[j + 2] = bytes[i + 2];
+          rgba[j + 3] = 255;
+        }
+      } else {
+        const depth = new Float32Array(bytes.buffer);
+        let min = Infinity;
+        let max = -Infinity;
+        for (const value of depth) {
+          if (Number.isFinite(value) && value > 0) {
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+          }
+        }
+        if (!Number.isFinite(min) || max <= min) {
+          min = 0;
+          max = 1;
+        }
+        for (let i = 0, j = 0; i < depth.length; i++, j += 4) {
+          const value = Number.isFinite(depth[i]) ? depth[i] : max;
+          const gray = Math.max(0, Math.min(255, Math.round(255 * (1 - (value - min) / (max - min)))));
+          rgba[j] = gray;
+          rgba[j + 1] = gray;
+          rgba[j + 2] = gray;
+          rgba[j + 3] = 255;
+        }
       }
       canvas.getContext('2d').putImageData(new ImageData(rgba, image.width, image.height), 0, 0);
       status.textContent = `${image.width}x${image.height} ${image.encoding}`;
@@ -432,7 +456,7 @@ class RosBridge:
         rospy.Subscriber("/long_arm/hand_camera_pose", PoseStamped, self.state.update_hand_camera_pose, queue_size=1)
         rospy.Subscriber("/long_arm/hand_camera/image_raw", Image, self.state.update_camera_image, queue_size=1)
         rospy.Subscriber("/long_arm/tool_camera_pose", PoseStamped, self.state.update_tool_camera_pose, queue_size=1)
-        rospy.Subscriber("/long_arm/tool_camera/image_raw", Image, self.state.update_tool_camera_image, queue_size=1)
+        rospy.Subscriber("/long_arm/tool_camera/depth/image_raw", Image, self.state.update_tool_camera_image, queue_size=1)
         rospy.Subscriber("/long_arm/stability", Float64MultiArray, self.state.update_stability, queue_size=1)
         rospy.Subscriber("/long_arm/speed_scale_state", Float64, self.state.update_speed_scale, queue_size=1)
 

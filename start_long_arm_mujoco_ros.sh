@@ -20,7 +20,7 @@ WEB="${WEB:-true}"
 WEB_PORT="${WEB_PORT:-8088}"
 PUBLISH_CAMERA_IMAGE="${PUBLISH_CAMERA_IMAGE:-false}"
 CAMERA_NAME="${CAMERA_NAME:-left_eye_camera}"
-TOOL_CAMERA_NAME="${TOOL_CAMERA_NAME:-hand_camera}"
+TOOL_CAMERA_NAME="${TOOL_CAMERA_NAME:-hand_depth_camera}"
 CAMERA_WIDTH="${CAMERA_WIDTH:-320}"
 CAMERA_HEIGHT="${CAMERA_HEIGHT:-240}"
 CAMERA_RATE_HZ="${CAMERA_RATE_HZ:-10}"
@@ -63,7 +63,7 @@ usage() {
 
 常用短命令:
   start       重启并打开 MuJoCo 原生界面，等待前端/ROS 控制。
-  camera      重启控制模式，并发布手部相机图像。
+  camera      重启控制模式，并发布末端深度相机图像。
   stop        停止仿真。
   status      检查容器、前端、关节和相机状态。
   logs        查看日志。
@@ -212,7 +212,7 @@ print_banner() {
   Web前端:     ${WEB}
   前端地址:    http://localhost:${WEB_PORT}
   相机视角:    ${CAMERA_NAME}
-  手部相机:    ${TOOL_CAMERA_NAME}
+  末端深度相机: ${TOOL_CAMERA_NAME}
   模型:        piper_wall_mount_description.xml
   安装方式:    墙面垂直安装
   URDF:        piper_description.urdf
@@ -581,7 +581,7 @@ Piper MuJoCo ROS 仿真菜单
   ROS地址:    ${ROS_MASTER_URI}
   运行速度:   ${SPEED_SCALE}x
   前端地址:   http://localhost:${WEB_PORT}
-  模型:       墙面垂直安装 + 夹爪 + 手部相机
+  模型:       墙面垂直安装 + 夹爪 + 末端深度相机
 
 常用操作:
   1) 启动仿真        MuJoCo界面 + ROS/前端控制
