@@ -116,7 +116,8 @@ class PiperMujocoRos:
         self.joint_names = tuple(rospy.get_param("~joint_names", list(DEFAULT_JOINT_NAMES)))
         self.gripper_open = float(rospy.get_param("~gripper_open", 0.030))
         self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.0))
-        self.camera_name = rospy.get_param("~camera_name", "hand_camera")
+        self.camera_name = rospy.get_param("~camera_name", "left_eye_camera")
+        self.tool_camera_name = rospy.get_param("~tool_camera_name", "hand_camera")
         self.publish_camera_image_enabled = bool(rospy.get_param("~publish_camera_image", False))
         self.camera_width = int(rospy.get_param("~camera_width", 320))
         self.camera_height = int(rospy.get_param("~camera_height", 240))
@@ -140,7 +141,8 @@ class PiperMujocoRos:
         self.data = mujoco.MjData(self.model)
         self.ik_data = mujoco.MjData(self.model)
         self.ee_body_id = int(self.model.body(self.ee_body_name).id)
-        self.camera_id = self.resolve_camera_id()
+        self.camera_id = self.resolve_camera_id(self.camera_name)
+        self.tool_camera_id = self.resolve_camera_id(self.tool_camera_name)
         self.camera_renderer = self.create_camera_renderer()
         self.tool_force = np.zeros(3)
         self.target_pose = None
@@ -172,12 +174,16 @@ class PiperMujocoRos:
         self.speed_scale_pub = rospy.Publisher("/long_arm/speed_scale_state", Float64, queue_size=10)
         self.camera_pose_pub = rospy.Publisher("/long_arm/hand_camera_pose", PoseStamped, queue_size=10)
         self.camera_image_pub = rospy.Publisher("/long_arm/hand_camera/image_raw", Image, queue_size=2)
+        self.tool_camera_pose_pub = rospy.Publisher("/long_arm/tool_camera_pose", PoseStamped, queue_size=10)
+        self.tool_camera_image_pub = rospy.Publisher("/long_arm/tool_camera/image_raw", Image, queue_size=2)
 
         rospy.loginfo("Loaded real Piper MuJoCo model: %s", xml_path)
         rospy.loginfo("Published real URDF to /robot_description: %s", urdf_path)
         rospy.loginfo("Joints: %s, end effector body: %s", list(self.joint_names), self.ee_body_name)
         if self.camera_id is not None:
-            rospy.loginfo("MuJoCo camera: %s", self.camera_name)
+            rospy.loginfo("MuJoCo observer camera: %s", self.camera_name)
+        if self.tool_camera_id is not None:
+            rospy.loginfo("MuJoCo hand camera: %s", self.tool_camera_name)
 
     def publish_robot_description(self, urdf_path):
         with open(urdf_path, "r") as f:
@@ -192,15 +198,15 @@ class PiperMujocoRos:
             actuator_ids.append(int(self.model.actuator(joint_name).id))
         return actuator_ids
 
-    def resolve_camera_id(self):
+    def resolve_camera_id(self, camera_name):
         try:
-            return int(self.model.camera(self.camera_name).id)
+            return int(self.model.camera(camera_name).id)
         except KeyError:
-            rospy.logwarn("Camera '%s' not found in MuJoCo model; camera topics will stay empty.", self.camera_name)
+            rospy.logwarn("Camera '%s' not found in MuJoCo model; camera topics will stay empty.", camera_name)
             return None
 
     def create_camera_renderer(self):
-        if not self.publish_camera_image_enabled or self.camera_id is None:
+        if not self.publish_camera_image_enabled or (self.camera_id is None and self.tool_camera_id is None):
             return None
         try:
             return mujoco.Renderer(self.model, height=self.camera_height, width=self.camera_width)
@@ -381,14 +387,11 @@ class PiperMujocoRos:
         speed_msg.data = self.speed_scale
         self.speed_scale_pub.publish(speed_msg)
 
-        self.publish_camera(now)
+        self.publish_cameras(now)
 
-    def publish_camera(self, now):
-        if self.camera_id is None:
-            return
-
-        pos = self.data.cam_xpos[self.camera_id].copy()
-        rot = self.data.cam_xmat[self.camera_id].reshape(3, 3).copy()
+    def camera_pose_msg(self, camera_id, now):
+        pos = self.data.cam_xpos[camera_id].copy()
+        rot = self.data.cam_xmat[camera_id].reshape(3, 3).copy()
         quat = rotmat_to_wxyz(rot)
 
         pose_msg = PoseStamped()
@@ -397,32 +400,44 @@ class PiperMujocoRos:
         pose_msg.pose.position.y = pos[1]
         pose_msg.pose.position.z = pos[2]
         wxyz_to_ros_quat(quat, pose_msg.pose.orientation)
-        self.camera_pose_pub.publish(pose_msg)
+        return pose_msg
+
+    def publish_cameras(self, now):
+        if self.camera_id is not None:
+            self.camera_pose_pub.publish(self.camera_pose_msg(self.camera_id, now))
+        if self.tool_camera_id is not None:
+            self.tool_camera_pose_pub.publish(self.camera_pose_msg(self.tool_camera_id, now))
 
         if self.camera_renderer is None:
             return
         if self.camera_rate_hz > 0.0 and (now.to_sec() - self.last_camera_pub) < (1.0 / self.camera_rate_hz):
             return
         self.last_camera_pub = now.to_sec()
-        image = self.render_camera_image()
+        self.publish_camera_image(self.camera_id, self.camera_name, self.camera_image_pub, now)
+        self.publish_camera_image(self.tool_camera_id, self.tool_camera_name, self.tool_camera_image_pub, now)
+
+    def publish_camera_image(self, camera_id, camera_name, image_pub, now):
+        if camera_id is None:
+            return
+        image = self.render_camera_image(camera_name)
         if image is None:
             return
         image_msg = Image()
-        image_msg.header = Header(stamp=now, frame_id=self.camera_name)
+        image_msg.header = Header(stamp=now, frame_id=camera_name)
         image_msg.height = int(image.shape[0])
         image_msg.width = int(image.shape[1])
         image_msg.encoding = "rgb8"
         image_msg.is_bigendian = 0
         image_msg.step = int(image.shape[1] * 3)
         image_msg.data = image.tobytes()
-        self.camera_image_pub.publish(image_msg)
+        image_pub.publish(image_msg)
 
-    def render_camera_image(self):
+    def render_camera_image(self, camera_name):
         try:
-            self.camera_renderer.update_scene(self.data, camera=self.camera_name)
+            self.camera_renderer.update_scene(self.data, camera=camera_name)
             return self.camera_renderer.render()
         except Exception as exc:
-            rospy.logwarn_throttle(5.0, "Could not render camera image: %s", exc)
+            rospy.logwarn_throttle(5.0, "Could not render %s image: %s", camera_name, exc)
             return None
 
     def step_once(self):

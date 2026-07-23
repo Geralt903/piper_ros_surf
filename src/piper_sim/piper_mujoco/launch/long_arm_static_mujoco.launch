@@ -13,6 +13,7 @@
   <arg name="web" default="true"/>
   <arg name="web_port" default="8088"/>
   <arg name="camera_name" default="left_eye_camera"/>
+  <arg name="tool_camera_name" default="hand_camera"/>
   <arg name="publish_camera_image" default="false"/>
   <arg name="camera_width" default="320"/>
   <arg name="camera_height" default="240"/>
@@ -35,6 +36,7 @@
     <param name="xml_path" value="$(arg xml_path)"/>
     <param name="urdf_path" value="$(arg urdf_path)"/>
     <param name="camera_name" value="$(arg camera_name)"/>
+    <param name="tool_camera_name" value="$(arg tool_camera_name)"/>
     <param name="publish_camera_image" value="$(arg publish_camera_image)"/>
     <param name="camera_width" value="$(arg camera_width)"/>
     <param name="camera_height" value="$(arg camera_height)"/>
