@@ -14,6 +14,7 @@ ROS_HOSTNAME="${ROS_HOSTNAME:-localhost}"
 ROS_IP="${ROS_IP:-127.0.0.1}"
 MUJOCO_GL="${MUJOCO_GL:-osmesa}"
 BASE_MUJOCO_GL="${MUJOCO_GL}"
+SPEED_SCALE="${SPEED_SCALE:-1.0}"
 PUBLISH_TF="${PUBLISH_TF:-false}"
 WEB="${WEB:-true}"
 WEB_PORT="${WEB_PORT:-8088}"
@@ -33,6 +34,7 @@ compose() {
   ROS_HOSTNAME="${ROS_HOSTNAME}" \
   ROS_IP="${ROS_IP}" \
   MUJOCO_GL="${MUJOCO_GL}" \
+  SPEED_SCALE="${SPEED_SCALE}" \
   PUBLISH_TF="${PUBLISH_TF}" \
   WEB="${WEB}" \
   WEB_PORT="${WEB_PORT}" \
@@ -75,6 +77,7 @@ usage() {
   PROJECT=${PROJECT}
   ROS_PORT=${ROS_PORT}
   MUJOCO_GL=${MUJOCO_GL}
+  SPEED_SCALE=${SPEED_SCALE}
   VIEWER=${VIEWER}
   PUBLISH_TF=${PUBLISH_TF}
   WEB=${WEB}
@@ -197,6 +200,7 @@ print_banner() {
   ROS master: ${ROS_MASTER_URI}
   ROS host:   ${ROS_HOSTNAME} (${ROS_IP})
   MuJoCo GL:  ${MUJOCO_GL}
+  运行速度:    ${SPEED_SCALE}x
   原生界面:    ${VIEWER}
   发布 /tf:    ${PUBLISH_TF}
   Web前端:     ${WEB}
@@ -337,6 +341,7 @@ doctor() {
   echo "  ROS_PORT=${ROS_PORT}"
   echo "  ROS_MASTER_URI=${ROS_MASTER_URI}"
   echo "  MUJOCO_GL=${MUJOCO_GL}"
+  echo "  SPEED_SCALE=${SPEED_SCALE}"
   echo "  VIEWER=${VIEWER}"
   echo "  LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE}"
   echo "  MESA_LOADER_DRIVER_OVERRIDE=${MESA_LOADER_DRIVER_OVERRIDE}"
@@ -565,6 +570,7 @@ Piper MuJoCo ROS 仿真菜单
 当前配置:
   Docker项目: ${PROJECT}
   ROS地址:    ${ROS_MASTER_URI}
+  运行速度:   ${SPEED_SCALE}x
   前端地址:   http://localhost:${WEB_PORT}
   模型:       墙面垂直安装 + 夹爪 + 手部相机
 

@@ -15,6 +15,7 @@ services:
       __GLX_VENDOR_LIBRARY_NAME: ${__GLX_VENDOR_LIBRARY_NAME:-mesa}
       VIEWER: ${VIEWER:-false}
       DEMO: ${DEMO:-true}
+      SPEED_SCALE: ${SPEED_SCALE:-1.0}
       ROS_MASTER_URI: http://localhost:${ROS_PORT:-11312}
       ROS_HOSTNAME: ${ROS_HOSTNAME:-localhost}
       ROS_IP: ${ROS_IP:-127.0.0.1}
@@ -35,6 +36,7 @@ services:
       roslaunch -p ${ROS_PORT:-11312} piper_mujoco long_arm_static_mujoco.launch
       viewer:=${VIEWER:-false}
       demo:=${DEMO:-true}
+      speed_scale:=${SPEED_SCALE:-1.0}
       publish_tf:=${PUBLISH_TF:-false}
       web:=${WEB:-true}
       web_port:=${WEB_PORT:-8088}

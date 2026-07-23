@@ -76,6 +76,18 @@ INDEX_HTML = """<!doctype html>
         <button class="secondary" onclick="setGripper(0.03)">Open</button>
         <button class="secondary" onclick="setGripper(0.0)">Close</button>
       </div>
+      <h2>Run Speed</h2>
+      <div class="joint">
+        <label>speed</label>
+        <input id="speed" type="range" min="0" max="4" step="0.05" value="1">
+        <input id="speed_num" type="number" min="0" max="4" step="0.05" value="1">
+      </div>
+      <div class="row">
+        <button onclick="sendSpeed()">Set speed</button>
+        <button class="secondary" onclick="setSpeed(0)">Pause</button>
+        <button class="secondary" onclick="setSpeed(1)">1x</button>
+        <button class="secondary" onclick="setSpeed(2)">2x</button>
+      </div>
       <h2>Pose Target</h2>
       <div class="grid">
         <label>x <input id="px" type="number" value="0.16" step="0.01"></label>
@@ -97,6 +109,7 @@ INDEX_HTML = """<!doctype html>
         <div>Bridge</div><div id="bridge" class="bad">connecting</div>
         <div>Joint names</div><div id="names"></div>
         <div>Joint position</div><div id="positions"></div>
+        <div>Run speed</div><div id="speed_state"></div>
         <div>End effector</div><div id="ee"></div>
         <div>Hand camera</div><div id="camera"></div>
         <div>Stability</div><div id="stability"></div>
@@ -185,6 +198,16 @@ INDEX_HTML = """<!doctype html>
       await sendGripper();
     }
 
+    async function sendSpeed() {
+      await post('/api/speed_scale', {speed_scale: Number(document.getElementById('speed').value)});
+    }
+
+    async function setSpeed(speed) {
+      document.getElementById('speed').value = speed;
+      document.getElementById('speed_num').value = speed;
+      await sendSpeed();
+    }
+
     async function sendPose() {
       await post('/api/pose_target', {
         position: ['px', 'py', 'pz'].map(id => Number(document.getElementById(id).value)),
@@ -199,6 +222,13 @@ INDEX_HTML = """<!doctype html>
         document.getElementById('bridge').className = 'ok';
         document.getElementById('names').textContent = (state.joint_state.name || []).join(', ');
         document.getElementById('positions').textContent = (state.joint_state.position || []).map(v => v.toFixed(3)).join(', ');
+        const speedScale = Number(state.speed_scale || 0);
+        document.getElementById('speed_state').textContent = `${speedScale.toFixed(2)}x`;
+        if (document.activeElement !== document.getElementById('speed') &&
+            document.activeElement !== document.getElementById('speed_num')) {
+          document.getElementById('speed').value = speedScale;
+          document.getElementById('speed_num').value = speedScale.toFixed(2);
+        }
         const p = state.end_effector_pose.position || {};
         document.getElementById('ee').textContent = `x=${fmt(p.x)} y=${fmt(p.y)} z=${fmt(p.z)}`;
         const c = state.hand_camera_pose.position || {};
@@ -219,6 +249,12 @@ INDEX_HTML = """<!doctype html>
     document.getElementById('gripper_num').addEventListener('input', () => {
       document.getElementById('gripper').value = document.getElementById('gripper_num').value;
     });
+    document.getElementById('speed').addEventListener('input', () => {
+      document.getElementById('speed_num').value = document.getElementById('speed').value;
+    });
+    document.getElementById('speed_num').addEventListener('input', () => {
+      document.getElementById('speed').value = document.getElementById('speed_num').value;
+    });
     pollState();
     setInterval(pollState, 500);
   </script>
@@ -234,6 +270,7 @@ class BridgeState:
         self.end_effector_pose = {}
         self.hand_camera_pose = {}
         self.stability = []
+        self.speed_scale = 1.0
 
     def update_joint_state(self, msg):
         with self.lock:
@@ -282,6 +319,10 @@ class BridgeState:
         with self.lock:
             self.stability = list(msg.data)
 
+    def update_speed_scale(self, msg):
+        with self.lock:
+            self.speed_scale = float(msg.data)
+
     def snapshot(self):
         with self.lock:
             return {
@@ -289,6 +330,7 @@ class BridgeState:
                 "end_effector_pose": self.end_effector_pose,
                 "hand_camera_pose": self.hand_camera_pose,
                 "stability": self.stability,
+                "speed_scale": self.speed_scale,
             }
 
 
@@ -299,10 +341,12 @@ class RosBridge:
         self.gripper_pub = rospy.Publisher("/long_arm/gripper_target", Float64, queue_size=1)
         self.pose_pub = rospy.Publisher("/long_arm/target_pose", PoseStamped, queue_size=1)
         self.force_pub = rospy.Publisher("/long_arm/tool_force", WrenchStamped, queue_size=1)
+        self.speed_pub = rospy.Publisher("/long_arm/speed_scale", Float64, queue_size=1)
         rospy.Subscriber("/joint_states", JointState, self.state.update_joint_state, queue_size=1)
         rospy.Subscriber("/long_arm/end_effector_pose", PoseStamped, self.state.update_pose, queue_size=1)
         rospy.Subscriber("/long_arm/hand_camera_pose", PoseStamped, self.state.update_hand_camera_pose, queue_size=1)
         rospy.Subscriber("/long_arm/stability", Float64MultiArray, self.state.update_stability, queue_size=1)
+        rospy.Subscriber("/long_arm/speed_scale_state", Float64, self.state.update_speed_scale, queue_size=1)
 
     def publish_joint_target(self, payload):
         positions = payload.get("positions")
@@ -353,6 +397,14 @@ class RosBridge:
         msg.wrench.force.z = float(force[2])
         self.force_pub.publish(msg)
         return {"ok": True, "topic": "/long_arm/tool_force"}
+
+    def publish_speed_scale(self, payload):
+        if "speed_scale" not in payload:
+            raise ValueError("speed_scale is required")
+        msg = Float64()
+        msg.data = max(0.0, min(4.0, float(payload["speed_scale"])))
+        self.speed_pub.publish(msg)
+        return {"ok": True, "topic": "/long_arm/speed_scale", "speed_scale": msg.data}
 
 
 def make_handler(bridge):
@@ -406,6 +458,8 @@ def make_handler(bridge):
                     result = bridge.publish_pose_target(payload)
                 elif self.path == "/api/tool_force":
                     result = bridge.publish_tool_force(payload)
+                elif self.path == "/api/speed_scale":
+                    result = bridge.publish_speed_scale(payload)
                 else:
                     self._send(404, {"ok": False, "error": "not found"})
                     return

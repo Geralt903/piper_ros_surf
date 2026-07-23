@@ -2,6 +2,7 @@
   <arg name="viewer" default="false"/>
   <arg name="demo" default="true"/>
   <arg name="rate_hz" default="200"/>
+  <arg name="speed_scale" default="1.0"/>
   <arg name="hold_time" default="3.0"/>
   <arg name="kp" default="140.0"/>
   <arg name="kd" default="18.0"/>
@@ -26,6 +27,7 @@
     <param name="viewer" value="$(arg viewer)"/>
     <param name="demo" value="$(arg demo)"/>
     <param name="rate_hz" value="$(arg rate_hz)"/>
+    <param name="speed_scale" value="$(arg speed_scale)"/>
     <param name="hold_time" value="$(arg hold_time)"/>
     <param name="kp" value="$(arg kp)"/>
     <param name="kd" value="$(arg kd)"/>

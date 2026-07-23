@@ -107,6 +107,7 @@ class PiperMujocoRos:
         self.lock = threading.Lock()
 
         self.rate_hz = float(rospy.get_param("~rate_hz", 200.0))
+        self.speed_scale = float(rospy.get_param("~speed_scale", 1.0))
         self.viewer_enabled = bool(rospy.get_param("~viewer", False))
         self.demo_enabled = bool(rospy.get_param("~demo", True))
         self.hold_time = float(rospy.get_param("~hold_time", 3.0))
@@ -163,10 +164,12 @@ class PiperMujocoRos:
         rospy.Subscriber("/long_arm/tool_force", WrenchStamped, self.tool_force_cb, queue_size=1)
         rospy.Subscriber("/long_arm/joint_target", JointState, self.joint_target_cb, queue_size=1)
         rospy.Subscriber("/long_arm/gripper_target", Float64, self.gripper_target_cb, queue_size=1)
+        rospy.Subscriber("/long_arm/speed_scale", Float64, self.speed_scale_cb, queue_size=1)
 
         self.joint_pub = rospy.Publisher("/joint_states", JointState, queue_size=10, tcp_nodelay=True)
         self.ee_pose_pub = rospy.Publisher("/long_arm/end_effector_pose", PoseStamped, queue_size=10)
         self.stability_pub = rospy.Publisher("/long_arm/stability", Float64MultiArray, queue_size=10)
+        self.speed_scale_pub = rospy.Publisher("/long_arm/speed_scale_state", Float64, queue_size=10)
         self.camera_pose_pub = rospy.Publisher("/long_arm/hand_camera_pose", PoseStamped, queue_size=10)
         self.camera_image_pub = rospy.Publisher("/long_arm/hand_camera/image_raw", Image, queue_size=2)
 
@@ -311,6 +314,10 @@ class PiperMujocoRos:
             else:
                 self.q_target = q
 
+    def speed_scale_cb(self, msg):
+        with self.lock:
+            self.speed_scale = float(np.clip(msg.data, 0.0, 4.0))
+
     def apply_tool_reaction(self, tool_force):
         self.data.xfrc_applied[:] = 0.0
         # WrenchStamped is interpreted as tool-on-environment force; MuJoCo body
@@ -324,7 +331,7 @@ class PiperMujocoRos:
 
     def demo_target(self):
         idx = min(
-            int((rospy.get_time() % (self.hold_time * len(self.demo_sequence))) // self.hold_time),
+            int((self.data.time % (self.hold_time * len(self.demo_sequence))) // self.hold_time),
             len(self.demo_sequence) - 1,
         )
         _, q_target, force = self.demo_sequence[idx]
@@ -369,6 +376,10 @@ class PiperMujocoRos:
         stability_msg = Float64MultiArray()
         stability_msg.data = self.stability_values(tool_force).tolist()
         self.stability_pub.publish(stability_msg)
+
+        speed_msg = Float64()
+        speed_msg.data = self.speed_scale
+        self.speed_scale_pub.publish(speed_msg)
 
         self.publish_camera(now)
 
@@ -426,28 +437,41 @@ class PiperMujocoRos:
         self.publish(tool_force)
 
     def run_without_viewer(self):
-        rate = rospy.Rate(self.rate_hz)
         while not rospy.is_shutdown():
+            with self.lock:
+                speed_scale = self.speed_scale
+            if speed_scale <= 0.0:
+                self.publish(self.tool_force.copy())
+                rospy.sleep(0.05)
+                continue
+            step_start = time.time()
             self.step_once()
-            rate.sleep()
+            sleep_time = (self.model.opt.timestep / speed_scale) - (time.time() - step_start)
+            if sleep_time > 0.0:
+                rospy.sleep(sleep_time)
 
     def run_with_viewer(self):
         import mujoco.viewer
 
-        rate = rospy.Rate(self.rate_hz)
         with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
             viewer.cam.azimuth = 130
             viewer.cam.elevation = -25
             viewer.cam.distance = 1.2
             viewer.cam.lookat[:] = np.array([0.0, 0.0, 0.20])
             while not rospy.is_shutdown() and viewer.is_running():
+                with self.lock:
+                    speed_scale = self.speed_scale
+                if speed_scale <= 0.0:
+                    self.publish(self.tool_force.copy())
+                    viewer.sync()
+                    rospy.sleep(0.05)
+                    continue
                 step_start = time.time()
                 self.step_once()
                 viewer.sync()
-                elapsed = time.time() - step_start
-                if elapsed < self.model.opt.timestep:
-                    time.sleep(self.model.opt.timestep - elapsed)
-                rate.sleep()
+                sleep_time = (self.model.opt.timestep / speed_scale) - (time.time() - step_start)
+                if sleep_time > 0.0:
+                    rospy.sleep(sleep_time)
 
     def run(self):
         if self.viewer_enabled:
