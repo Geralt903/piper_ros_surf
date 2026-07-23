@@ -23,6 +23,7 @@ services:
       WEB: ${WEB:-true}
       WEB_PORT: ${WEB_PORT:-8088}
       PUBLISH_CAMERA_IMAGE: ${PUBLISH_CAMERA_IMAGE:-false}
+      CAMERA_NAME: ${CAMERA_NAME:-left_eye_camera}
       CAMERA_WIDTH: ${CAMERA_WIDTH:-320}
       CAMERA_HEIGHT: ${CAMERA_HEIGHT:-240}
       CAMERA_RATE_HZ: ${CAMERA_RATE_HZ:-10}
@@ -41,6 +42,7 @@ services:
       web:=${WEB:-true}
       web_port:=${WEB_PORT:-8088}
       publish_camera_image:=${PUBLISH_CAMERA_IMAGE:-false}
+      camera_name:=${CAMERA_NAME:-left_eye_camera}
       camera_width:=${CAMERA_WIDTH:-320}
       camera_height:=${CAMERA_HEIGHT:-240}
       camera_rate_hz:=${CAMERA_RATE_HZ:-10}"

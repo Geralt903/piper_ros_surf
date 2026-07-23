@@ -19,6 +19,7 @@ PUBLISH_TF="${PUBLISH_TF:-false}"
 WEB="${WEB:-true}"
 WEB_PORT="${WEB_PORT:-8088}"
 PUBLISH_CAMERA_IMAGE="${PUBLISH_CAMERA_IMAGE:-false}"
+CAMERA_NAME="${CAMERA_NAME:-left_eye_camera}"
 CAMERA_WIDTH="${CAMERA_WIDTH:-320}"
 CAMERA_HEIGHT="${CAMERA_HEIGHT:-240}"
 CAMERA_RATE_HZ="${CAMERA_RATE_HZ:-10}"
@@ -39,6 +40,7 @@ compose() {
   WEB="${WEB}" \
   WEB_PORT="${WEB_PORT}" \
   PUBLISH_CAMERA_IMAGE="${PUBLISH_CAMERA_IMAGE}" \
+  CAMERA_NAME="${CAMERA_NAME}" \
   CAMERA_WIDTH="${CAMERA_WIDTH}" \
   CAMERA_HEIGHT="${CAMERA_HEIGHT}" \
   CAMERA_RATE_HZ="${CAMERA_RATE_HZ}" \
@@ -83,6 +85,7 @@ usage() {
   WEB=${WEB}
   WEB_PORT=${WEB_PORT}
   PUBLISH_CAMERA_IMAGE=${PUBLISH_CAMERA_IMAGE}
+  CAMERA_NAME=${CAMERA_NAME}
 
 示例:
   ./start_long_arm_mujoco_ros.sh
@@ -205,6 +208,7 @@ print_banner() {
   发布 /tf:    ${PUBLISH_TF}
   Web前端:     ${WEB}
   前端地址:    http://localhost:${WEB_PORT}
+  相机视角:    ${CAMERA_NAME}
   模型:        piper_wall_mount_description.xml
   安装方式:    墙面垂直安装
   URDF:        piper_description.urdf
@@ -350,6 +354,7 @@ doctor() {
   echo "  WEB=${WEB}"
   echo "  WEB_PORT=${WEB_PORT}"
   echo "  PUBLISH_CAMERA_IMAGE=${PUBLISH_CAMERA_IMAGE}"
+  echo "  CAMERA_NAME=${CAMERA_NAME}"
   echo "  CAMERA_WIDTH=${CAMERA_WIDTH}"
   echo "  CAMERA_HEIGHT=${CAMERA_HEIGHT}"
   echo "  CAMERA_RATE_HZ=${CAMERA_RATE_HZ}"

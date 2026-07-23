@@ -12,7 +12,7 @@
   <arg name="publish_tf" default="false"/>
   <arg name="web" default="true"/>
   <arg name="web_port" default="8088"/>
-  <arg name="camera_name" default="hand_camera"/>
+  <arg name="camera_name" default="left_eye_camera"/>
   <arg name="publish_camera_image" default="false"/>
   <arg name="camera_width" default="320"/>
   <arg name="camera_height" default="240"/>

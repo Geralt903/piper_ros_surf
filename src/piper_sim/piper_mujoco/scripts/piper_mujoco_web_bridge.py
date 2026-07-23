@@ -3,12 +3,13 @@
 """Tiny HTTP frontend and ROS topic bridge for the Piper MuJoCo simulation."""
 
 import json
+import base64
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import rospy
 from geometry_msgs.msg import PoseStamped, WrenchStamped
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import Image, JointState
 from std_msgs.msg import Float64, Float64MultiArray, Header
 
 
@@ -41,6 +42,7 @@ INDEX_HTML = """<!doctype html>
     .ok { color: #147d3f; }
     .bad { color: #9b1c1c; }
     pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+    canvas { width: 100%; max-width: 640px; background: #111820; border: 1px solid #d9e0e6; border-radius: 8px; display: block; margin-bottom: 12px; }
     @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -104,6 +106,8 @@ INDEX_HTML = """<!doctype html>
     </section>
 
     <section>
+      <h2>Left Eye Camera</h2>
+      <canvas id="camera_view" width="320" height="240"></canvas>
       <h2>Status</h2>
       <div class="kv">
         <div>Bridge</div><div id="bridge" class="bad">connecting</div>
@@ -111,7 +115,8 @@ INDEX_HTML = """<!doctype html>
         <div>Joint position</div><div id="positions"></div>
         <div>Run speed</div><div id="speed_state"></div>
         <div>End effector</div><div id="ee"></div>
-        <div>Hand camera</div><div id="camera"></div>
+        <div>Camera pose</div><div id="camera"></div>
+        <div>Camera image</div><div id="camera_image_state"></div>
         <div>Stability</div><div id="stability"></div>
       </div>
       <h2>Raw State</h2>
@@ -233,6 +238,7 @@ INDEX_HTML = """<!doctype html>
         document.getElementById('ee').textContent = `x=${fmt(p.x)} y=${fmt(p.y)} z=${fmt(p.z)}`;
         const c = state.hand_camera_pose.position || {};
         document.getElementById('camera').textContent = `x=${fmt(c.x)} y=${fmt(c.y)} z=${fmt(c.z)}`;
+        drawCameraImage(state.camera_image || {});
         document.getElementById('stability').textContent = (state.stability || []).map(v => Number(v).toFixed(4)).join(', ');
         document.getElementById('raw').textContent = JSON.stringify(state, null, 2);
       } catch (err) {
@@ -242,6 +248,28 @@ INDEX_HTML = """<!doctype html>
     }
 
     function fmt(v) { return Number(v || 0).toFixed(3); }
+    function drawCameraImage(image) {
+      const status = document.getElementById('camera_image_state');
+      if (!image.data || image.encoding !== 'rgb8') {
+        status.textContent = 'waiting';
+        return;
+      }
+      const canvas = document.getElementById('camera_view');
+      if (canvas.width !== image.width || canvas.height !== image.height) {
+        canvas.width = image.width;
+        canvas.height = image.height;
+      }
+      const bytes = Uint8Array.from(atob(image.data), c => c.charCodeAt(0));
+      const rgba = new Uint8ClampedArray(image.width * image.height * 4);
+      for (let i = 0, j = 0; i < bytes.length; i += 3, j += 4) {
+        rgba[j] = bytes[i];
+        rgba[j + 1] = bytes[i + 1];
+        rgba[j + 2] = bytes[i + 2];
+        rgba[j + 3] = 255;
+      }
+      canvas.getContext('2d').putImageData(new ImageData(rgba, image.width, image.height), 0, 0);
+      status.textContent = `${image.width}x${image.height} ${image.encoding}`;
+    }
     makeJointControls();
     document.getElementById('gripper').addEventListener('input', () => {
       document.getElementById('gripper_num').value = document.getElementById('gripper').value;
@@ -269,6 +297,7 @@ class BridgeState:
         self.joint_state = {}
         self.end_effector_pose = {}
         self.hand_camera_pose = {}
+        self.camera_image = {}
         self.stability = []
         self.speed_scale = 1.0
 
@@ -315,6 +344,15 @@ class BridgeState:
                 },
             }
 
+    def update_camera_image(self, msg):
+        with self.lock:
+            self.camera_image = {
+                "width": int(msg.width),
+                "height": int(msg.height),
+                "encoding": msg.encoding,
+                "data": base64.b64encode(bytes(msg.data)).decode("ascii"),
+            }
+
     def update_stability(self, msg):
         with self.lock:
             self.stability = list(msg.data)
@@ -329,6 +367,7 @@ class BridgeState:
                 "joint_state": self.joint_state,
                 "end_effector_pose": self.end_effector_pose,
                 "hand_camera_pose": self.hand_camera_pose,
+                "camera_image": self.camera_image,
                 "stability": self.stability,
                 "speed_scale": self.speed_scale,
             }
@@ -345,6 +384,7 @@ class RosBridge:
         rospy.Subscriber("/joint_states", JointState, self.state.update_joint_state, queue_size=1)
         rospy.Subscriber("/long_arm/end_effector_pose", PoseStamped, self.state.update_pose, queue_size=1)
         rospy.Subscriber("/long_arm/hand_camera_pose", PoseStamped, self.state.update_hand_camera_pose, queue_size=1)
+        rospy.Subscriber("/long_arm/hand_camera/image_raw", Image, self.state.update_camera_image, queue_size=1)
         rospy.Subscriber("/long_arm/stability", Float64MultiArray, self.state.update_stability, queue_size=1)
         rospy.Subscriber("/long_arm/speed_scale_state", Float64, self.state.update_speed_scale, queue_size=1)
 

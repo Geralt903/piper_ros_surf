@@ -177,7 +177,7 @@ class PiperMujocoRos:
         rospy.loginfo("Published real URDF to /robot_description: %s", urdf_path)
         rospy.loginfo("Joints: %s, end effector body: %s", list(self.joint_names), self.ee_body_name)
         if self.camera_id is not None:
-            rospy.loginfo("Hand camera: %s", self.camera_name)
+            rospy.loginfo("MuJoCo camera: %s", self.camera_name)
 
     def publish_robot_description(self, urdf_path):
         with open(urdf_path, "r") as f:
@@ -422,7 +422,7 @@ class PiperMujocoRos:
             self.camera_renderer.update_scene(self.data, camera=self.camera_name)
             return self.camera_renderer.render()
         except Exception as exc:
-            rospy.logwarn_throttle(5.0, "Could not render hand camera image: %s", exc)
+            rospy.logwarn_throttle(5.0, "Could not render camera image: %s", exc)
             return None
 
     def step_once(self):
