@@ -565,16 +565,12 @@ Piper MuJoCo ROS 仿真菜单
 
 常用操作:
   1) 启动仿真        MuJoCo界面 + ROS/前端控制
-  2) 启动相机        无MuJoCo界面 + 发布手部相机图像
-  3) 状态检查        容器/前端/关节/相机
+  2) 状态检查        容器/前端/关节/相机
+  3) 夹爪控制        张开/闭合/半开
   4) 前端地址        显示 http://localhost:${WEB_PORT}
-  5) 张开夹爪
-  6) 闭合夹爪
-  7) 半开夹爪
-  8) 日志
-  9) 停止仿真
- 10) 清理残留
- 11) 更多命令
+  5) 日志
+  6) 停止仿真
+  7) 高级功能        相机/清理/topics/shell/build
   q) 退出
 
 短命令也可直接输入: start, camera, status, open, close, half, stop
@@ -584,16 +580,13 @@ EOF
 menu_to_command() {
   case "$1" in
     1) echo start ;;
-    2) echo camera ;;
-    3) echo status ;;
+    2) echo status ;;
+    3) echo gripper-menu ;;
     4) echo frontend ;;
-    5) echo open ;;
-    6) echo close ;;
-    7) echo half ;;
-    8) echo logs ;;
-    9) echo stop ;;
-    10) echo cleanup ;;
-    11|m|M|more) echo help ;;
+    5) echo logs ;;
+    6) echo stop ;;
+    7|a|A|advanced) echo advanced-menu ;;
+    m|M|more) echo help ;;
     h|H|help|--help|-h) echo help ;;
     q|Q|quit|exit) echo quit ;;
     *) echo "$1" ;;
@@ -648,10 +641,118 @@ run_menu_command() {
       PUBLISH_CAMERA_IMAGE=false
       start_runtime_detached false control-tf false
       ;;
+    gripper-menu)
+      gripper_menu
+      ;;
+    advanced-menu)
+      advanced_menu
+      ;;
     *)
       run_command "${command}"
       ;;
   esac
+}
+
+gripper_menu() {
+  while true; do
+    clear 2>/dev/null || true
+    cat <<EOF
+夹爪控制
+
+  1) 张开
+  2) 闭合
+  3) 半开
+  b) 返回
+
+EOF
+    read -r -p "请选择: " selection
+    case "${selection}" in
+      1|open)
+        run_command open
+        ;;
+      2|close)
+        run_command close
+        ;;
+      3|half)
+        run_command half
+        ;;
+      b|B|back|q|Q)
+        return 0
+        ;;
+      *)
+        echo "无效选项: ${selection}"
+        ;;
+    esac
+    echo
+    read -r -p "按 Enter 继续..." _
+  done
+}
+
+advanced_menu() {
+  while true; do
+    clear 2>/dev/null || true
+    cat <<EOF
+高级功能
+
+  1) 启动相机图像       camera
+  2) 清理残留容器       cleanup
+  3) ROS话题列表        topics
+  4) 读取一次状态       echo
+  5) 测试关节命令       api-test
+  6) 发布示例关节       pub-joint
+  7) 发布示例位姿       pub-pose
+  8) 进入容器shell      shell
+  9) 诊断信息           doctor
+ 10) 构建镜像           build
+ 11) 更多命令帮助       help
+  b) 返回
+
+EOF
+    read -r -p "请选择: " selection
+    case "${selection}" in
+      1|camera)
+        run_menu_command camera
+        ;;
+      2|cleanup)
+        run_command cleanup
+        ;;
+      3|topics)
+        run_command topics
+        ;;
+      4|echo)
+        run_command echo
+        ;;
+      5|api-test)
+        run_command api-test
+        ;;
+      6|pub-joint)
+        run_command pub-joint
+        ;;
+      7|pub-pose)
+        run_command pub-pose
+        ;;
+      8|shell|enter)
+        run_command shell
+        ;;
+      9|doctor)
+        run_command doctor
+        ;;
+      10|build)
+        run_command build
+        ;;
+      11|help|h|H)
+        run_command help
+        ;;
+      b|B|back|q|Q)
+        return 0
+        ;;
+      *)
+        echo "无效选项: ${selection}"
+        ;;
+    esac
+    echo
+    read -r -p "按 Enter 继续..." _
+  done
 }
 
 interactive_menu() {
