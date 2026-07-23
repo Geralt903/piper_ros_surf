@@ -62,7 +62,7 @@ usage() {
 不带 command 时进入中文交互菜单。
 
 常用短命令:
-  start       重启并打开 MuJoCo 原生界面，等待前端/ROS 控制。
+  start       重启并打开 MuJoCo 原生界面，同时发布网页相机。
   camera      重启控制模式，并发布末端深度相机图像。
   stop        停止仿真。
   status      检查容器、前端、关节和相机状态。
@@ -72,8 +72,8 @@ usage() {
   half        半开夹爪。
 
 其它命令:
-  demo, control, viewer, viewer-control, camera-control
-  restart-viewer-control, restart-camera-control
+  demo, control, viewer, viewer-control, viewer-camera, camera-control
+  restart-viewer-control, restart-viewer-camera, restart-camera-control
   frontend, topics, echo, api-test, pub-joint, pub-pose
   shell, ps, health, doctor, cleanup, build, old-stop
 
@@ -459,8 +459,8 @@ run_command() {
   case "${command}" in
     start|restart|restart-viewer)
       PUBLISH_TF=false
-      PUBLISH_CAMERA_IMAGE=false
-      restart_runtime_detached false viewer-control true
+      PUBLISH_CAMERA_IMAGE=true
+      restart_runtime_detached false viewer-camera true
       ;;
     camera|restart-camera)
       PUBLISH_TF=false
@@ -479,6 +479,10 @@ run_command() {
     viewer-control)
       start_runtime false viewer-control true
       ;;
+    viewer-camera)
+      PUBLISH_CAMERA_IMAGE=true
+      start_runtime false viewer-camera true
+      ;;
     camera-control)
       PUBLISH_CAMERA_IMAGE=true
       start_runtime false camera-control false
@@ -487,6 +491,11 @@ run_command() {
       PUBLISH_TF=false
       PUBLISH_CAMERA_IMAGE=false
       restart_runtime_detached false viewer-control true
+      ;;
+    restart-viewer-camera)
+      PUBLISH_TF=false
+      PUBLISH_CAMERA_IMAGE=true
+      restart_runtime_detached false viewer-camera true
       ;;
     restart-camera-control)
       PUBLISH_TF=false
@@ -636,6 +645,11 @@ run_menu_command() {
       PUBLISH_CAMERA_IMAGE=false
       start_runtime_detached false viewer-control true
       ;;
+    viewer-camera)
+      PUBLISH_TF=false
+      PUBLISH_CAMERA_IMAGE=true
+      start_runtime_detached false viewer-camera true
+      ;;
     camera-control)
       PUBLISH_TF=false
       PUBLISH_CAMERA_IMAGE=true
@@ -645,6 +659,11 @@ run_menu_command() {
       PUBLISH_TF=false
       PUBLISH_CAMERA_IMAGE=false
       restart_runtime_detached false viewer-control true
+      ;;
+    restart-viewer-camera)
+      PUBLISH_TF=false
+      PUBLISH_CAMERA_IMAGE=true
+      restart_runtime_detached false viewer-camera true
       ;;
     restart-camera-control)
       PUBLISH_TF=false
